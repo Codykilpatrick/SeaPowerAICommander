@@ -44,7 +44,7 @@ namespace SeaPowerForceAI
         }
 
         internal static bool Enabled => _cfgEnabled != null && _cfgEnabled.Value;
-        internal static float TickIntervalSeconds => _cfgTickInterval != null ? _cfgTickInterval.Value : 10f;
+        internal static float TickIntervalSeconds => _cfgTickInterval != null ? _cfgTickInterval.Value : 60f;
         internal static bool DrivePlayerTaskforce => _cfgDrivePlayerTaskforce != null && _cfgDrivePlayerTaskforce.Value;
 
         public static void Boot()
@@ -80,12 +80,15 @@ namespace SeaPowerForceAI
             _cfgEnabled = _config.Bind("General", "Enabled", true,
                 "Master switch. When false the force-AI tick does nothing, but the patch stays applied.");
 
-            _cfgTickInterval = _config.Bind("General", "TickIntervalSeconds", 10f,
+            _cfgTickInterval = _config.Bind("General", "TickIntervalSeconds", 60f,
                 new ConfigDescription(
-                    "Game-seconds between force-level decisions. The game's own Taskforce.CheckAI() " +
-                    "uses 10s. Lower is more responsive and more expensive - matters a lot once a " +
+                    "Game-seconds between force-level decisions. Force-level intent - where groups " +
+                    "go, what posture to hold - changes on a scale of minutes, so a minute is a " +
+                    "realistic command cycle rather than a compromise. The game's own " +
+                    "Taskforce.CheckAI() runs at 10s, but that handles finer-grained work. " +
+                    "Lower is more responsive and proportionally more expensive once a " +
                     "network-backed brain is attached.",
-                    new AcceptableValueRange<float>(1f, 300f)));
+                    new AcceptableValueRange<float>(1f, 600f)));
 
             _cfgDrivePlayerTaskforce = _config.Bind("General", "DrivePlayerTaskforce", false,
                 "Also run the brain on the player's own task force. Off by default - useful only " +

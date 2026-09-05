@@ -17,8 +17,10 @@ called every frame (`Taskforce.cs:332`) — with an empty body. This mod postfix
 method, so it **adds** a decision layer rather than overriding one. There is no incumbent
 behaviour to conflict with.
 
-Cadence follows the game's own precedent: `Taskforce` throttles its internal `CheckAI()`
-to 10 seconds (`Taskforce.cs:405`), so this ticks at 10s by default rather than per-frame.
+It ticks every 60s by default, not per-frame. The game throttles its own `CheckAI()` to
+10s (`Taskforce.cs:405`), but that handles finer-grained work — force-level intent changes
+on a scale of minutes, so a one-minute command cycle is realistic rather than a compromise.
+It also keeps a network-backed brain affordable.
 
 ## Design
 
@@ -95,9 +97,9 @@ Why out-of-process, and not the Anthropic SDK in the plugin: Unity's Mono runtim
 hostile to modern BCL dependency trees, the API key stays out of a distributed mod, and
 prompts can be iterated without the full game restart a code-mod change requires.
 
-**Cost is real.** One call per AI task force per tick. At the default 10s tick, a
-30-minute battle with two AI task forces is roughly 360 calls. Raise
-`TickIntervalSeconds` before you raise your spend.
+**Cost is real.** One call per AI task force per tick. At the default 60s tick, a
+30-minute battle with two AI task forces is about 60 calls. Dropping the tick to 10s
+multiplies that by six for responsiveness you mostly won't notice at this altitude.
 
 **Failure is non-fatal by design.** If the sidecar is not running, or a cycle fails, the
 mod logs a warning and the game's own tactical AI keeps fighting. `HttpBrain` also drops

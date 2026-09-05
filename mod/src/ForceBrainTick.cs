@@ -15,8 +15,10 @@ namespace SeaPowerForceAI
     /// the shipped game. There is no incumbent behaviour here, so a postfix adds a
     /// force-level decision layer without overriding anything.
     ///
-    /// Cadence follows the game's own precedent: Taskforce throttles its CheckAI() to
-    /// 10 seconds (Taskforce.cs:405). Running per-frame at this altitude would be waste.
+    /// Cadence is throttled hard - 60s by default. The game throttles its own CheckAI()
+    /// to 10s (Taskforce.cs:405), but that handles finer-grained work; force-level intent
+    /// changes on a scale of minutes. Running per-frame at this altitude would be waste,
+    /// and with a network-backed brain it would also be expensive.
     /// </summary>
     [HarmonyPatch(typeof(TaskForceAI), nameof(TaskForceAI.OnUpdate))]
     internal static class ForceBrainTick
