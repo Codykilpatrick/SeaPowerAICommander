@@ -29,6 +29,24 @@ public static class CommanderPrompt
         - Absence of contacts is not absence of enemies. It usually means you have not
           found them yet.
 
+        YOU ARE MID-ENGAGEMENT, NOT STARTING FRESH
+
+        You are called repeatedly during one battle. Each call carries what happened since
+        the last:
+
+        - standingOrders are the orders you gave last cycle that took effect. Those units
+          are already carrying them out. Do NOT reissue an order that is already standing
+          and still correct - change an order only when the situation has changed enough
+          to warrant it. Most units, most cycles, need nothing new.
+        - recentLosses are units you had at the last decision and no longer have. They
+          were almost certainly sunk or shot down.
+        - totalLosses is your cumulative attrition for the battle.
+        - secondsSinceLastDecision tells you how stale your standing orders are.
+
+        Take losses seriously. A force that is steadily losing ships and gaining nothing
+        is losing the battle, and withdrawing to preserve what remains is a legitimate and
+        sometimes correct decision. Do not fight to annihilation out of momentum.
+
         HOW TO THINK
 
         Weigh the things a real commander weighs: the threat axis, whether your high-value
@@ -37,10 +55,9 @@ public static class CommanderPrompt
         justify shooting it. Concentrate force against what matters and do not scatter your
         escorts chasing every unclassified contact.
 
-        Prefer few, deliberate orders. Most cycles need none at all - you are called
-        repeatedly, and re-ordering units that are already doing the right thing wastes
-        their time and yours. An empty order list is a good answer when the posture is
-        sound.
+        Prefer few, deliberate orders. Most cycles need none at all. An empty order list is
+        a good answer when the posture is already sound - and with standing orders in
+        force, it is often the right one.
 
         HARD CONSTRAINTS
 
@@ -60,6 +77,22 @@ public static class CommanderPrompt
         var sb = new StringBuilder();
         sb.AppendLine($"Tactical picture at mission time {picture.TimeSeconds:F0}s.");
         sb.AppendLine($"You command \"{picture.TaskforceName}\" (side: {picture.Side}). Alert state: {(picture.IsOnAlert ? "ALERT" : "normal")}.");
+
+        // Surface continuity in the prose too, not only buried in the JSON - losses and
+        // standing orders are the things most likely to be skimmed past.
+        if (picture.SecondsSinceLastDecision >= 0f)
+            sb.AppendLine($"Last decision was {picture.SecondsSinceLastDecision:F0}s ago; {picture.StandingOrders.Count} order(s) still standing.");
+        else
+            sb.AppendLine("This is your first decision of the battle - no standing orders.");
+
+        if (picture.RecentLosses.Count > 0)
+        {
+            var names = picture.RecentLosses.ConvertAll(l => $"{l.Name} ({l.Category})");
+            sb.AppendLine($"LOST since last decision: {string.Join(", ", names)}.");
+        }
+        if (picture.TotalLosses > 0)
+            sb.AppendLine($"Cumulative losses this battle: {picture.TotalLosses}.");
+
         sb.AppendLine();
         sb.AppendLine(json);
         sb.AppendLine();

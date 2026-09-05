@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using HarmonyLib;
 using SeaPower;
@@ -58,6 +59,16 @@ namespace SeaPowerForceAI
         {
             public float NextSubmitTime = float.MinValue;
             public IForceBrain Brain;
+
+            /// <summary>Units present at the last decision, so losses can be diffed against now.</summary>
+            public readonly Dictionary<int, LostUnit> KnownUnits = new Dictionary<int, LostUnit>();
+
+            /// <summary>Orders last applied, replayed to the brain as standing orders.</summary>
+            public List<ForceOrder> StandingOrders = new List<ForceOrder>();
+
+            public int TotalLosses;
+            public float LastDecisionTime = -1f;
+            public bool Seeded;
         }
 
         private static void Postfix(TaskForceAI __instance)
@@ -106,7 +117,13 @@ namespace SeaPowerForceAI
             // submitting, so a slow brain still gets its orders in promptly.
             ForceOrderSet ready;
             if (state.Brain.TryTakeOrders(out ready))
-                OrderExecutor.Apply(tf, ready);
+            {
+                var accepted = OrderExecutor.Apply(tf, ready);
+
+                // Only orders that actually took effect become standing orders. Replaying
+                // a rejected order would tell the brain a dead ship is still under way.
+                state.StandingOrders = accepted;
+            }
 
             var now = GameTime.time;
             if (now < state.NextSubmitTime) return;
@@ -119,7 +136,52 @@ namespace SeaPowerForceAI
             // empty fleet costs real money to be told "nothing".
             if (picture.OwnUnits.Count == 0) return;
 
+            ApplyContinuity(state, picture, now);
+
             state.Brain.Submit(picture);
+        }
+
+        /// <summary>
+        /// Gives the picture a memory: what was ordered last cycle, and what has been lost
+        /// since. Without this the brain re-derives everything each tick and cannot tell
+        /// that it is losing the battle.
+        /// </summary>
+        private static void ApplyContinuity(BrainState state, TacticalPicture picture, float now)
+        {
+            // Diff this cycle's roster against the last to find losses. Skipped on the
+            // first decision - every unit would otherwise look newly arrived.
+            if (state.Seeded)
+            {
+                var present = new HashSet<int>();
+                foreach (var u in picture.OwnUnits) present.Add(u.Id);
+
+                foreach (var pair in state.KnownUnits)
+                {
+                    if (!present.Contains(pair.Key))
+                        picture.RecentLosses.Add(pair.Value);
+                }
+
+                state.TotalLosses += picture.RecentLosses.Count;
+                picture.SecondsSinceLastDecision = now - state.LastDecisionTime;
+            }
+
+            picture.TotalLosses = state.TotalLosses;
+            picture.StandingOrders = state.StandingOrders;
+
+            // Re-seed the roster for the next diff.
+            state.KnownUnits.Clear();
+            foreach (var u in picture.OwnUnits)
+            {
+                state.KnownUnits[u.Id] = new LostUnit
+                {
+                    Id = u.Id,
+                    Name = u.Name,
+                    Category = u.Category,
+                };
+            }
+
+            state.LastDecisionTime = now;
+            state.Seeded = true;
         }
     }
 }

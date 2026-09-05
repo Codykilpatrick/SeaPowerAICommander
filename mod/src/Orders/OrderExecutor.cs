@@ -14,12 +14,18 @@ namespace SeaPowerForceAI.Orders
     /// </summary>
     public static class OrderExecutor
     {
-        public static void Apply(Taskforce tf, ForceOrderSet set)
+        /// <summary>
+        /// Applies a set of orders and returns those that actually took effect, so they
+        /// can be replayed to the brain next cycle as standing orders. Replaying a
+        /// rejected order would tell the brain a sunk ship is still under way.
+        /// </summary>
+        public static List<ForceOrder> Apply(Taskforce tf, ForceOrderSet set)
         {
-            if (tf == null || set == null || set.Orders == null) return;
+            var accepted = new List<ForceOrder>();
+            if (tf == null || set == null || set.Orders == null) return accepted;
 
             var byId = IndexOwnUnits(tf);
-            int applied = 0, rejected = 0;
+            int rejected = 0;
 
             foreach (var order in set.Orders)
             {
@@ -28,7 +34,8 @@ namespace SeaPowerForceAI.Orders
                 ObjectBase unit;
                 if (!byId.TryGetValue(order.UnitId, out unit))
                 {
-                    // Not ours, destroyed, or hallucinated. Never trust the id.
+                    // Not ours, sunk between the picture being sent and the orders coming
+                    // back, or hallucinated. Never trust the id.
                     Plugin.Log.LogWarning($"[orders] rejected {order.Kind} - unit {order.UnitId} not in {tf._nameInMissionFile}");
                     rejected++;
                     continue;
@@ -36,7 +43,7 @@ namespace SeaPowerForceAI.Orders
 
                 try
                 {
-                    if (ApplyOne(unit, order)) applied++;
+                    if (ApplyOne(unit, order)) accepted.Add(order);
                     else rejected++;
                 }
                 catch (Exception ex)
@@ -46,8 +53,10 @@ namespace SeaPowerForceAI.Orders
                 }
             }
 
-            if (applied > 0 || rejected > 0)
-                Plugin.Log.LogInfo($"[orders] {tf._nameInMissionFile}: applied {applied}, rejected {rejected}");
+            if (accepted.Count > 0 || rejected > 0)
+                Plugin.Log.LogInfo($"[orders] {tf._nameInMissionFile}: applied {accepted.Count}, rejected {rejected}");
+
+            return accepted;
         }
 
         private static bool ApplyOne(ObjectBase unit, ForceOrder order)

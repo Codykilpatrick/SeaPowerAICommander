@@ -33,6 +33,41 @@ namespace SeaPowerForceAI.Picture
         /// was filtered away" (high while Contacts is empty). Not tactical data.
         /// </summary>
         public int PlotEntries;
+
+        // ---- Continuity ----
+        //
+        // Without these a brain is amnesiac: it re-derives intent from scratch every
+        // cycle, re-commands units already carrying out its own orders, and cannot tell
+        // a fleet that has lost half its ships from one that was always small. Attrition
+        // is arguably the most important single input to a force-level decision, and a
+        // stateless picture hides it completely.
+
+        /// <summary>
+        /// Orders issued last cycle and presumed still in force. Units acting on these
+        /// need no new orders - reissuing them wastes the decision and the tokens.
+        /// </summary>
+        public List<Orders.ForceOrder> StandingOrders = new List<Orders.ForceOrder>();
+
+        /// <summary>Units present at the previous decision and absent now - almost always losses.</summary>
+        public List<LostUnit> RecentLosses = new List<LostUnit>();
+
+        /// <summary>Running total of units lost since the mission began.</summary>
+        public int TotalLosses;
+
+        /// <summary>
+        /// Game-seconds since the previous decision, so the brain can judge how stale
+        /// its standing orders are. -1 on the first decision of a mission.
+        /// </summary>
+        public float SecondsSinceLastDecision = -1f;
+    }
+
+    public class LostUnit
+    {
+        public int Id;
+        public string Name;
+
+        /// <summary>Vessel / Submarine / Aircraft / Helicopter / LandUnit.</summary>
+        public string Category;
     }
 
     public class OwnUnit
