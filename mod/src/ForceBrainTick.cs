@@ -113,6 +113,12 @@ namespace SeaPowerForceAI
             state.NextSubmitTime = now + Plugin.TickIntervalSeconds;
 
             var picture = PictureBuilder.Build(tf);
+
+            // Nothing to command. Missions carry task forces that hold no units at all
+            // (an empty Neutral side, for one), and asking a model what to do with an
+            // empty fleet costs real money to be told "nothing".
+            if (picture.OwnUnits.Count == 0) return;
+
             state.Brain.Submit(picture);
         }
     }

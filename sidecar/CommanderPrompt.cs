@@ -76,5 +76,11 @@ public static class PictureJson
         DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
         WriteIndented = false,
         IncludeFields = true,
+
+        // Case-insensitive as a safety net. The mod now emits camelCase explicitly, but
+        // a casing mismatch here fails SILENTLY - every property falls back to its
+        // default and the sidecar sees an empty task force rather than an error. That
+        // failure mode cost a debugging session once; it should not be possible twice.
+        PropertyNameCaseInsensitive = true,
     };
 }

@@ -26,6 +26,13 @@ namespace SeaPowerForceAI.Picture
 
         /// <summary>Detected contacts. A contact is not necessarily identified or classified.</summary>
         public List<Contact> Contacts = new List<Contact>();
+
+        /// <summary>
+        /// Diagnostic: total entries in the task force plotting table before own units
+        /// were filtered out. Separates "we have detected nothing" (low) from "everything
+        /// was filtered away" (high while Contacts is empty). Not tactical data.
+        /// </summary>
+        public int PlotEntries;
     }
 
     public class OwnUnit

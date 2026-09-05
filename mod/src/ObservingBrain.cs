@@ -32,10 +32,14 @@ namespace SeaPowerForceAI
             Plugin.Log.LogInfo(
                 $"[picture] {picture.TaskforceName} ({picture.Side}) t={picture.TimeSeconds:F0}s " +
                 $"alert={picture.IsOnAlert} own={picture.OwnUnits.Count} " +
+                $"plot={picture.PlotEntries} " +
                 $"contacts={picture.Contacts.Count} (identified {identified}, bearing-only {bearingOnly})");
 
+            // Info, not Debug: BepInEx's disk logger here is configured for
+            // "Fatal, Error, Warning, Message, Info", so LogDebug writes nothing to
+            // LogOutput.log and the setting would look broken.
             if (_dumpJson)
-                Plugin.Log.LogDebug(JsonConvert.SerializeObject(picture, Formatting.Indented));
+                Plugin.Log.LogInfo(JsonConvert.SerializeObject(picture, Formatting.Indented));
         }
 
         public bool TryTakeOrders(out ForceOrderSet orders)

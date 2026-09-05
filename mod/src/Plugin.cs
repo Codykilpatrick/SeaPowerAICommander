@@ -33,6 +33,7 @@ namespace SeaPowerForceAI
         private static ConfigEntry<BrainType> _cfgBrain;
         private static ConfigEntry<string> _cfgSidecarEndpoint;
         private static ConfigEntry<int> _cfgSidecarTimeoutMs;
+        private static ConfigEntry<int> _cfgMinRequestGapMs;
 
         public enum BrainType
         {
@@ -111,6 +112,15 @@ namespace SeaPowerForceAI
                     "How long to wait for a decision before abandoning that cycle. Runs on a " +
                     "background thread, so this never stalls the game.",
                     new AcceptableValueRange<int>(1000, 600000)));
+
+            _cfgMinRequestGapMs = _config.Bind("Brain", "MinRequestGapMs", 4000,
+                new ConfigDescription(
+                    "Minimum WALL-CLOCK milliseconds between sidecar requests, across all " +
+                    "task forces. TickIntervalSeconds is game time, so time compression " +
+                    "multiplies the request rate and every task force has its own brain - " +
+                    "together they can burst past a provider rate limit. 4000ms holds the " +
+                    "total at or under 15/min, inside OpenRouter's 20/min new-account cap.",
+                    new AcceptableValueRange<int>(0, 120000)));
         }
 
         /// <summary>
@@ -124,7 +134,10 @@ namespace SeaPowerForceAI
             switch (type)
             {
                 case BrainType.Sidecar:
-                    return new HttpBrain(_cfgSidecarEndpoint.Value, _cfgSidecarTimeoutMs.Value);
+                    return new HttpBrain(
+                        _cfgSidecarEndpoint.Value,
+                        _cfgSidecarTimeoutMs.Value,
+                        _cfgMinRequestGapMs.Value);
 
                 default:
                     return new ObservingBrain(_cfgDumpPictureJson != null && _cfgDumpPictureJson.Value);

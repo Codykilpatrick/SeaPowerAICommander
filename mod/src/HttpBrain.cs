@@ -3,6 +3,7 @@ using System.Net;
 using System.Text;
 using System.Threading;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 using SeaPowerForceAI.Orders;
 using SeaPowerForceAI.Picture;
 
@@ -18,17 +19,42 @@ namespace SeaPowerForceAI
     /// </summary>
     public class HttpBrain : IForceBrain
     {
+        /// <summary>
+        /// camelCase on the wire. Newtonsoft defaults to the member name as-written
+        /// (PascalCase); the sidecar's System.Text.Json is configured for camelCase and is
+        /// case-SENSITIVE by default. Without this every property silently fails to bind
+        /// and the sidecar receives a picture where every field is at its default - an
+        /// empty task force with no name, no units and no contacts, which looks like a
+        /// quiet battle rather than a bug.
+        /// </summary>
+        private static readonly JsonSerializerSettings WireSettings = new JsonSerializerSettings
+        {
+            ContractResolver = new CamelCasePropertyNamesContractResolver(),
+        };
+
+        /// <summary>
+        /// Wall-clock floor shared across every task force's brain.
+        ///
+        /// The tick interval is GAME seconds, so time compression multiplies the request
+        /// rate, and each task force carries its own brain instance - together they can
+        /// burst well past a provider's per-minute limit. This gate is the backstop.
+        /// </summary>
+        private static readonly object RateGate = new object();
+        private static DateTime _lastRequestUtc = DateTime.MinValue;
+
         private readonly string _endpoint;
         private readonly int _timeoutMs;
+        private readonly int _minRequestGapMs;
 
         // Written by the worker thread, read by the Unity thread.
         private volatile ForceOrderSet _ready;
         private volatile bool _inFlight;
 
-        public HttpBrain(string endpoint, int timeoutMs)
+        public HttpBrain(string endpoint, int timeoutMs, int minRequestGapMs)
         {
             _endpoint = endpoint;
             _timeoutMs = timeoutMs;
+            _minRequestGapMs = minRequestGapMs;
         }
 
         public void Submit(TacticalPicture picture)
@@ -41,12 +67,26 @@ namespace SeaPowerForceAI
                 return;
             }
 
+            // Wall-clock backstop against time compression and many task forces at once.
+            lock (RateGate)
+            {
+                var since = (DateTime.UtcNow - _lastRequestUtc).TotalMilliseconds;
+                if (since < _minRequestGapMs)
+                {
+                    Plugin.Log.LogInfo(
+                        $"[brain] rate gate: skipping {picture.TaskforceName}, " +
+                        $"{since:F0}ms since last request (floor {_minRequestGapMs}ms)");
+                    return;
+                }
+                _lastRequestUtc = DateTime.UtcNow;
+            }
+
             _inFlight = true;
 
             string body;
             try
             {
-                body = JsonConvert.SerializeObject(picture);
+                body = JsonConvert.SerializeObject(picture, WireSettings);
             }
             catch (Exception ex)
             {

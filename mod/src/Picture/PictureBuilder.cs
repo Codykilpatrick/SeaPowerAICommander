@@ -73,20 +73,27 @@ namespace SeaPowerForceAI.Picture
             {
                 vehicles = plot.Vehicles.ToList();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                // Never swallow this. A silent return here looks identical to "the task
+                // force has detected nothing", which is the hardest kind of bug to spot.
+                Plugin.Log.LogError($"[picture] could not read plotting table for {picture.TaskforceName}: {ex}");
                 return;
             }
 
+            picture.PlotEntries = vehicles.Count;
+
+            int skipNullVehicle = 0, skipNoObject = 0, skipOwn = 0;
+
             foreach (var veh in vehicles)
             {
-                if (veh == null) continue;
+                if (veh == null) { skipNullVehicle++; continue; }
 
                 var obj = veh.Object;
-                if (obj == null || obj.IsDestroyed) continue;
+                if (obj == null || obj.IsDestroyed) { skipNoObject++; continue; }
 
                 // Our own units come through OwnUnits; the plotting table also holds them.
-                if (obj._taskforce == tf) continue;
+                if (obj._taskforce == tf) { skipOwn++; continue; }
 
                 var contact = new Contact
                 {
@@ -105,6 +112,13 @@ namespace SeaPowerForceAI.Picture
 
                 picture.Contacts.Add(contact);
             }
+
+            // One line that fully accounts for every plotting-table entry, so a zero
+            // contact count is always explainable without another mission run.
+            Plugin.Log.LogInfo(
+                $"[plot] {picture.TaskforceName}: {vehicles.Count} entries -> " +
+                $"{picture.Contacts.Count} contacts " +
+                $"(skipped: own={skipOwn}, noObject={skipNoObject}, nullVehicle={skipNullVehicle})");
         }
 
         private static void ApplyPosition(Contact contact, Vehicle veh)
