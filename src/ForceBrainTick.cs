@@ -23,9 +23,27 @@ namespace SeaPowerForceAI
     {
         /// <summary>
         /// TaskForceAI._taskforce is private. Cached FieldRef beats reflection per frame.
+        ///
+        /// Resolved defensively: a static initializer that throws would surface as a
+        /// TypeInitializationException inside Harmony's call path on every frame, which
+        /// is far worse than degrading to a no-op. If a game update renames the field,
+        /// this stays null and the tick disables itself with one log line.
         /// </summary>
-        private static readonly AccessTools.FieldRef<TaskForceAI, Taskforce> TaskforceOf =
-            AccessTools.FieldRefAccess<TaskForceAI, Taskforce>("_taskforce");
+        private static readonly AccessTools.FieldRef<TaskForceAI, Taskforce> TaskforceOf = ResolveTaskforceField();
+
+        private static bool _fieldMissingLogged;
+
+        private static AccessTools.FieldRef<TaskForceAI, Taskforce> ResolveTaskforceField()
+        {
+            try
+            {
+                return AccessTools.FieldRefAccess<TaskForceAI, Taskforce>("_taskforce");
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
 
         /// <summary>
         /// Per-task-force state, keyed weakly so a torn-down task force is collected
@@ -58,6 +76,18 @@ namespace SeaPowerForceAI
 
         private static void Tick(TaskForceAI instance)
         {
+            if (TaskforceOf == null)
+            {
+                if (!_fieldMissingLogged)
+                {
+                    _fieldMissingLogged = true;
+                    Plugin.Log.LogError(
+                        "TaskForceAI._taskforce could not be resolved - the game version likely " +
+                        "changed. Force AI is inactive; re-check the field name against this build.");
+                }
+                return;
+            }
+
             var tf = TaskforceOf(instance);
             if (tf == null) return;
 
