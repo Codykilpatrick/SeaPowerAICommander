@@ -66,6 +66,47 @@ and shipping copies would break type identity.
 **Sea Power cannot hot-reload code mods.** Toggling the mod only reloads the scene; you
 must fully close and reopen the game to load or unload it.
 
+## Layout
+
+```
+contract/   netstandard2.0 - TacticalPicture, ForceOrder. Referenced by BOTH sides,
+            so the wire format and the LLM schema cannot drift from the executor.
+mod/        net472  - the BepInEx plugin that runs inside the game.
+sidecar/    net8.0  - the out-of-process brain that calls OpenRouter.
+```
+
+## The LLM sidecar
+
+Set `Brain.Type = Sidecar` in the config, then run the sidecar alongside the game.
+
+```bash
+setx OPENROUTER_API_KEY "sk-or-..."     # from https://openrouter.ai/keys, then reopen your terminal
+dotnet run --project sidecar
+```
+
+| Env var | Default | Meaning |
+|---|---|---|
+| `OPENROUTER_API_KEY` | *(required)* | Your key. Never read by the mod or committed. |
+| `FORCEAI_MODEL` | `anthropic/claude-opus-4.5` | Any OpenRouter model id that supports structured outputs. |
+| `FORCEAI_PREFIX` | `http://127.0.0.1:8787/` | Listener address. Loopback only by design. |
+| `FORCEAI_TIMEOUT_SECONDS` | `90` | Per-decision ceiling. |
+
+Why out-of-process, and not the Anthropic SDK in the plugin: Unity's Mono runtime is
+hostile to modern BCL dependency trees, the API key stays out of a distributed mod, and
+prompts can be iterated without the full game restart a code-mod change requires.
+
+**Cost is real.** One call per AI task force per tick. At the default 10s tick, a
+30-minute battle with two AI task forces is roughly 360 calls. Raise
+`TickIntervalSeconds` before you raise your spend.
+
+**Failure is non-fatal by design.** If the sidecar is not running, or a cycle fails, the
+mod logs a warning and the game's own tactical AI keeps fighting. `HttpBrain` also drops
+a submission while one is already in flight — a stale naval picture is worse than none.
+
+**Multiplayer will desync** if both clients run brains independently. The host must own
+the loop and replicate resulting orders; `TaskForceAI.OnFixedUpdate` (also empty) is the
+deterministic-cadence hook to patch for that.
+
 ## Current state
 
 `ObservingBrain` is the default: it logs a one-line picture summary each tick and issues
@@ -82,18 +123,10 @@ keep validation in the executor. That enum is the whole action space.
 
 **Write a real brain:** implement `IForceBrain`, return it from `Plugin.CreateBrain()`.
 
-**Attach an LLM:** run it as a sidecar process, not in-process. The `Anthropic` NuGet
-package does resolve for net472, but it pulls System.Text.Json 10.x, System.Memory and
-Microsoft.Extensions.AI.Abstractions into Unity's Mono runtime — restoring is not the same
-as running. A sidecar also keeps API keys out of a distributed mod and lets you iterate on
-prompts without the full game restart a code-mod change requires. Have the brain POST the
-picture to `127.0.0.1`, hold the pending request, and return orders from `TryTakeOrders`
-when they arrive.
+**Tune the commander:** `sidecar/CommanderPrompt.cs`. Iterating on it needs only a
+sidecar restart, not a game restart.
 
-Generate the model's JSON schema from `ForceOrderKind` so it cannot emit an order the
-executor has no way to carry out. `OrderExecutor` validates every order against the live
-task force regardless — model output is never trusted.
-
-**Multiplayer:** if both clients run brains independently they will desync. The host must
-own the loop and replicate resulting orders; `TaskForceAI.OnFixedUpdate` (also empty) is
-the deterministic-cadence counterpart to patch.
+`OrderSchema.Build()` generates the model's JSON schema from `ForceOrderKind`, so the
+model cannot emit an order the executor has no way to carry out. `OrderExecutor` validates
+every order against the live task force regardless — model output is never trusted, and a
+bad unit id is dropped with a log line rather than thrown.

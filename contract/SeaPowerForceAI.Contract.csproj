@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The wire contract between the mod and the sidecar.
+
+    netstandard2.0 so it can be referenced by BOTH the net472 mod (Unity Mono) and the
+    net8.0 sidecar. Because both sides compile the same types, the JSON contract cannot
+    drift - and the LLM's output schema is generated from the same ForceOrderKind enum
+    that OrderExecutor switches on.
+
+    Keep this project dependency-free. Anything added here has to load inside Unity's
+    Mono runtime.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <AssemblyName>SeaPowerForceAI.Contract</AssemblyName>
+    <RootNamespace>SeaPowerForceAI</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+
+</Project>

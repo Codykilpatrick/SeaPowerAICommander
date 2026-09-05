@@ -18,6 +18,10 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net472" Version="1.0.3" PrivateAssets="all" />
+
+    <!-- Shared with the sidecar. Unlike the game references below, this one IS copied
+         next to the plugin - the game process has no other source for it. -->
+    <ProjectReference Include="..\contract\SeaPowerForceAI.Contract.csproj" />
   </ItemGroup>
 
   <!--
@@ -94,8 +98,13 @@
   -->
   <Target Name="DeployToGame" AfterTargets="Build"
           Condition="'$(DeployToGame)' != 'false' AND Exists('$(BepInExPluginsDir)')">
-    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(BepInExPluginsDir)" ContinueOnError="true" />
-    <Message Importance="high" Text="Deployed $(TargetFileName) -> $(BepInExPluginsDir)" />
+    <ItemGroup>
+      <!-- The plugin plus the contract assembly it depends on. -->
+      <DeployFiles Include="$(TargetPath)" />
+      <DeployFiles Include="$(TargetDir)SeaPowerForceAI.Contract.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(DeployFiles)" DestinationFolder="$(BepInExPluginsDir)" ContinueOnError="true" />
+    <Message Importance="high" Text="Deployed $(TargetFileName) + Contract -> $(BepInExPluginsDir)" />
   </Target>
 
 </Project>

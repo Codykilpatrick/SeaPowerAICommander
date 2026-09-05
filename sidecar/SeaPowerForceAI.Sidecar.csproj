@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Out-of-process brain.
+
+    Deliberately NOT loaded into the game. Unity's Mono runtime is hostile to modern BCL
+    dependency trees, the API key stays out of a distributed mod, and prompts can be
+    iterated without the full game restart a code-mod change requires.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>SeaPowerForceAI.Sidecar</AssemblyName>
+    <RootNamespace>SeaPowerForceAI.Sidecar</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\contract\SeaPowerForceAI.Contract.csproj" />
+  </ItemGroup>
+
+</Project>

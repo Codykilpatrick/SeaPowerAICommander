@@ -30,6 +30,18 @@ namespace SeaPowerForceAI
         private static ConfigEntry<float> _cfgTickInterval;
         private static ConfigEntry<bool> _cfgDrivePlayerTaskforce;
         private static ConfigEntry<bool> _cfgDumpPictureJson;
+        private static ConfigEntry<BrainType> _cfgBrain;
+        private static ConfigEntry<string> _cfgSidecarEndpoint;
+        private static ConfigEntry<int> _cfgSidecarTimeoutMs;
+
+        public enum BrainType
+        {
+            /// <summary>Log the picture, command nothing. Safe default.</summary>
+            Observing,
+
+            /// <summary>Send the picture to the out-of-process brain and execute its orders.</summary>
+            Sidecar,
+        }
 
         internal static bool Enabled => _cfgEnabled != null && _cfgEnabled.Value;
         internal static float TickIntervalSeconds => _cfgTickInterval != null ? _cfgTickInterval.Value : 10f;
@@ -82,6 +94,20 @@ namespace SeaPowerForceAI
             _cfgDumpPictureJson = _config.Bind("Debug", "DumpPictureJson", false,
                 "Write the full serialized tactical picture to the log at debug level each tick. " +
                 "Verbose - use it to inspect exactly what a brain would receive.");
+
+            _cfgBrain = _config.Bind("Brain", "Type", BrainType.Observing,
+                "Observing: log the picture, issue no orders. Sidecar: send the picture to the " +
+                "out-of-process brain and execute what it returns. Sidecar costs real money per " +
+                "decision and requires SeaPowerForceAI.Sidecar to be running.");
+
+            _cfgSidecarEndpoint = _config.Bind("Brain", "SidecarEndpoint", "http://127.0.0.1:8787/",
+                "Where the sidecar listens. Loopback only - do not point this off-machine.");
+
+            _cfgSidecarTimeoutMs = _config.Bind("Brain", "SidecarTimeoutMs", 90000,
+                new ConfigDescription(
+                    "How long to wait for a decision before abandoning that cycle. Runs on a " +
+                    "background thread, so this never stalls the game.",
+                    new AcceptableValueRange<int>(1000, 600000)));
         }
 
         /// <summary>
@@ -90,7 +116,16 @@ namespace SeaPowerForceAI
         /// </summary>
         internal static IForceBrain CreateBrain()
         {
-            return new ObservingBrain(_cfgDumpPictureJson != null && _cfgDumpPictureJson.Value);
+            var type = _cfgBrain != null ? _cfgBrain.Value : BrainType.Observing;
+
+            switch (type)
+            {
+                case BrainType.Sidecar:
+                    return new HttpBrain(_cfgSidecarEndpoint.Value, _cfgSidecarTimeoutMs.Value);
+
+                default:
+                    return new ObservingBrain(_cfgDumpPictureJson != null && _cfgDumpPictureJson.Value);
+            }
         }
     }
 }
