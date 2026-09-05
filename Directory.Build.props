@@ -11,7 +11,16 @@
 
     <GameManagedDir>$(SeaPowerDir)\Sea Power_Data\Managed</GameManagedDir>
     <BepInExCoreDir>$(SeaPowerDir)\BepInEx\core</BepInExCoreDir>
-    <BepInExPluginsDir>$(SeaPowerDir)\BepInEx\plugins</BepInExPluginsDir>
+
+    <!--
+      Anchor Chain finds mods by scanning FileManager.Directories - the game's own mod
+      search paths - NOT BepInEx\plugins. Those paths are the subfolders of
+      StreamingAssets (excluding original/user/EntityScenes) plus subscribed Workshop
+      items. So a local dev build installs as its own StreamingAssets subfolder with an
+      _info.ini, exactly like a Workshop item, and shows up in the in-game mod menu.
+    -->
+    <StreamingAssetsDir>$(SeaPowerDir)\Sea Power_Data\StreamingAssets</StreamingAssetsDir>
+    <ModDeployDir>$(StreamingAssetsDir)\SeaPowerForceAI</ModDeployDir>
 
     <!-- Anchor Chain (workshop id 3380210757) publishes AnchorChain.dll, which defines
          ACPlugin / IAnchorChainMod. Referenced at build time; loaded by its preloader at runtime. -->

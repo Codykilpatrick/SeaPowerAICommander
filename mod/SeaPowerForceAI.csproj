@@ -97,14 +97,17 @@
     Skip with: dotnet build -p:DeployToGame=false
   -->
   <Target Name="DeployToGame" AfterTargets="Build"
-          Condition="'$(DeployToGame)' != 'false' AND Exists('$(BepInExPluginsDir)')">
+          Condition="'$(DeployToGame)' != 'false' AND Exists('$(StreamingAssetsDir)')">
     <ItemGroup>
-      <!-- The plugin plus the contract assembly it depends on. -->
+      <!-- The plugin, the contract assembly it depends on, and the manifest that makes
+           the folder show up as a mod in the in-game menu. -->
       <DeployFiles Include="$(TargetPath)" />
       <DeployFiles Include="$(TargetDir)SeaPowerForceAI.Contract.dll" />
+      <DeployFiles Include="$(MSBuildProjectDirectory)\..\_info.ini" />
     </ItemGroup>
-    <Copy SourceFiles="@(DeployFiles)" DestinationFolder="$(BepInExPluginsDir)" ContinueOnError="true" />
-    <Message Importance="high" Text="Deployed $(TargetFileName) + Contract -> $(BepInExPluginsDir)" />
+    <MakeDir Directories="$(ModDeployDir)" />
+    <Copy SourceFiles="@(DeployFiles)" DestinationFolder="$(ModDeployDir)" ContinueOnError="true" />
+    <Message Importance="high" Text="Deployed to $(ModDeployDir)" />
   </Target>
 
 </Project>
