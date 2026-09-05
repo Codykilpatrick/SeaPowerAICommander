@@ -1,0 +1,10 @@
+bin/
+obj/
+*.user
+*.suo
+.vs/
+.idea/
+
+# Decompiled game source, if you drop a reference copy in the tree.
+# Never commit it - it's the publisher's code.
+decompiled/

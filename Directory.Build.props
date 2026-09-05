@@ -1,0 +1,21 @@
+<Project>
+
+  <!--
+    Paths to the game install and the Anchor Chain workshop mod.
+    Override either on the command line if your Steam library lives elsewhere:
+      dotnet build -p:SeaPowerDir="D:\Steam\steamapps\common\Sea Power"
+  -->
+  <PropertyGroup>
+    <SteamAppsDir Condition="'$(SteamAppsDir)' == ''">C:\Program Files (x86)\Steam\steamapps</SteamAppsDir>
+    <SeaPowerDir Condition="'$(SeaPowerDir)' == ''">$(SteamAppsDir)\common\Sea Power</SeaPowerDir>
+
+    <GameManagedDir>$(SeaPowerDir)\Sea Power_Data\Managed</GameManagedDir>
+    <BepInExCoreDir>$(SeaPowerDir)\BepInEx\core</BepInExCoreDir>
+    <BepInExPluginsDir>$(SeaPowerDir)\BepInEx\plugins</BepInExPluginsDir>
+
+    <!-- Anchor Chain (workshop id 3380210757) publishes AnchorChain.dll, which defines
+         ACPlugin / IAnchorChainMod. Referenced at build time; loaded by its preloader at runtime. -->
+    <AnchorChainDir Condition="'$(AnchorChainDir)' == ''">$(SteamAppsDir)\workshop\content\1286220\3380210757</AnchorChainDir>
+  </PropertyGroup>
+
+</Project>
