@@ -22,6 +22,39 @@ namespace SeaPowerForceAI.Orders
         SetWeaponStatus,
     }
 
+    public static class ForceOrderKinds
+    {
+        /// <summary>
+        /// True when the order's meaning depends on where things were at the moment it was
+        /// decided.
+        ///
+        /// This is what makes an order perishable. A waypoint derived from a contact's
+        /// position is wrong once that contact has moved; "weapons free" or "slow to 12
+        /// knots" is a posture that stays valid as long as the situation holds - and
+        /// force-level posture changes slowly by nature. Treating both alike means either
+        /// discarding good posture orders or acting on bad waypoints.
+        ///
+        /// This lives in the contract, not the mod, so whoever adds an order kind has to
+        /// answer the question right next to the kind itself.
+        /// </summary>
+        public static bool IsPositionDependent(ForceOrderKind kind)
+        {
+            switch (kind)
+            {
+                case ForceOrderKind.MoveTo:
+                    return true;
+
+                case ForceOrderKind.SetSpeed:
+                case ForceOrderKind.SetWeaponStatus:
+                    return false;
+
+                default:
+                    // An unclassified new kind is assumed perishable - the safe default.
+                    return true;
+            }
+        }
+    }
+
     public class ForceOrder
     {
         public ForceOrderKind Kind;

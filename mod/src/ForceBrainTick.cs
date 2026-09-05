@@ -155,16 +155,35 @@ namespace SeaPowerForceAI
         private static void Consume(Taskforce tf, BrainState state, ForceOrderSet ready)
         {
             var age = GameTime.time - ready.DerivedFromTime;
-            var limit = Plugin.MaxOrderAgeSeconds;
 
-            if (limit > 0f && age > limit)
+            // Filter per order, not per decision. A decision typically mixes perishable
+            // waypoints with durable posture; discarding the whole set to protect against
+            // one stale waypoint throws away orders that are still perfectly good.
+            var dropped = 0;
+            for (int i = ready.Orders.Count - 1; i >= 0; i--)
+            {
+                var order = ready.Orders[i];
+                if (order == null) continue;
+
+                var limit = ForceOrderKinds.IsPositionDependent(order.Kind)
+                    ? Plugin.MaxPositionalOrderAgeSeconds
+                    : Plugin.MaxPostureOrderAgeSeconds;
+
+                if (limit > 0f && age > limit)
+                {
+                    ready.Orders.RemoveAt(i);
+                    dropped++;
+                }
+            }
+
+            if (dropped > 0)
             {
                 Plugin.Log.LogWarning(
-                    $"[orders] discarding {ready.Orders.Count} order(s) for {tf._nameInMissionFile}: " +
-                    $"derived from a picture {age:F0}s old (limit {limit:F0}s). " +
-                    "Lower time compression or raise MaxOrderAgeSeconds.");
-                return;
+                    $"[orders] {tf._nameInMissionFile}: dropped {dropped} perishable order(s) " +
+                    $"from a picture {age:F0}s old; {ready.Orders.Count} durable order(s) kept.");
             }
+
+            if (ready.Orders.Count == 0) return;
 
             var accepted = OrderExecutor.Apply(tf, ready);
 

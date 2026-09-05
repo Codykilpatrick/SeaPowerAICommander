@@ -34,10 +34,14 @@ namespace SeaPowerForceAI
         private static ConfigEntry<string> _cfgSidecarEndpoint;
         private static ConfigEntry<int> _cfgSidecarTimeoutMs;
         private static ConfigEntry<int> _cfgMinRequestGapMs;
-        private static ConfigEntry<float> _cfgMaxOrderAgeSeconds;
+        private static ConfigEntry<float> _cfgMaxPositionalOrderAgeSeconds;
+        private static ConfigEntry<float> _cfgMaxPostureOrderAgeSeconds;
 
-        internal static float MaxOrderAgeSeconds =>
-            _cfgMaxOrderAgeSeconds != null ? _cfgMaxOrderAgeSeconds.Value : 180f;
+        internal static float MaxPositionalOrderAgeSeconds =>
+            _cfgMaxPositionalOrderAgeSeconds != null ? _cfgMaxPositionalOrderAgeSeconds.Value : 240f;
+
+        internal static float MaxPostureOrderAgeSeconds =>
+            _cfgMaxPostureOrderAgeSeconds != null ? _cfgMaxPostureOrderAgeSeconds.Value : 0f;
 
         public enum BrainType
         {
@@ -126,14 +130,21 @@ namespace SeaPowerForceAI
                     "total at or under 15/min, inside OpenRouter's 20/min new-account cap.",
                     new AcceptableValueRange<int>(0, 120000)));
 
-            _cfgMaxOrderAgeSeconds = _config.Bind("Brain", "MaxOrderAgeSeconds", 180f,
+            _cfgMaxPositionalOrderAgeSeconds = _config.Bind("Brain", "MaxPositionalOrderAgeSeconds", 240f,
                 new ConfigDescription(
-                    "Discard a decision if the picture it was derived from is older than " +
-                    "this many GAME seconds by the time it arrives. A network round trip " +
-                    "takes real seconds, so time compression makes decisions arrive stale - " +
-                    "at 10x, a 45s decision is 450 game-seconds out of date. Acting on a " +
-                    "stale picture is worse than not acting, because the tactical AI " +
-                    "underneath is still reacting to the present. 0 disables the check.",
+                    "Drop POSITION-DEPENDENT orders (MoveTo) if the picture they came from " +
+                    "is older than this many GAME seconds on arrival. A waypoint derived " +
+                    "from where a contact used to be is simply wrong once it has moved, and " +
+                    "time compression makes decisions arrive stale - at 10x a 45s decision " +
+                    "is 450 game-seconds out of date. 0 disables the check.",
+                    new AcceptableValueRange<float>(0f, 3600f)));
+
+            _cfgMaxPostureOrderAgeSeconds = _config.Bind("Brain", "MaxPostureOrderAgeSeconds", 0f,
+                new ConfigDescription(
+                    "Same, for orders that do NOT depend on position (SetSpeed, " +
+                    "SetWeaponStatus). Force-level posture changes slowly, so these stay " +
+                    "valid far longer than a waypoint - 0 (no limit) is the sensible " +
+                    "default. Raise it only if you want stale posture discarded too.",
                     new AcceptableValueRange<float>(0f, 3600f)));
         }
 
