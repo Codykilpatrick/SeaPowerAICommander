@@ -63,8 +63,16 @@ namespace SeaPowerForceAI
             /// <summary>Units present at the last decision, so losses can be diffed against now.</summary>
             public readonly Dictionary<int, LostUnit> KnownUnits = new Dictionary<int, LostUnit>();
 
-            /// <summary>Orders last applied, replayed to the brain as standing orders.</summary>
-            public List<ForceOrder> StandingOrders = new List<ForceOrder>();
+            /// <summary>
+            /// Orders currently in force, keyed by unit and kind.
+            ///
+            /// These ACCUMULATE. A cycle that issues no orders does not mean nothing is in
+            /// force - it means everything previously ordered still is. A new order
+            /// supersedes the previous one of the same kind for the same unit and leaves
+            /// every other unit's orders untouched.
+            /// </summary>
+            public readonly Dictionary<string, ForceOrder> StandingOrders =
+                new Dictionary<string, ForceOrder>();
 
             public int TotalLosses;
             public float LastDecisionTime = -1f;
@@ -117,13 +125,7 @@ namespace SeaPowerForceAI
             // submitting, so a slow brain still gets its orders in promptly.
             ForceOrderSet ready;
             if (state.Brain.TryTakeOrders(out ready))
-            {
-                var accepted = OrderExecutor.Apply(tf, ready);
-
-                // Only orders that actually took effect become standing orders. Replaying
-                // a rejected order would tell the brain a dead ship is still under way.
-                state.StandingOrders = accepted;
-            }
+                Consume(tf, state, ready);
 
             var now = GameTime.time;
             if (now < state.NextSubmitTime) return;
@@ -142,7 +144,38 @@ namespace SeaPowerForceAI
         }
 
         /// <summary>
-        /// Gives the picture a memory: what was ordered last cycle, and what has been lost
+        /// Applies a returned decision, unless it has been overtaken by events.
+        ///
+        /// The tick interval is GAME time but a network round trip is REAL time, and time
+        /// compression divorces the two: at 10x, a 45-second decision is made against a
+        /// picture seven game-minutes old by the time it lands. Acting on that is worse
+        /// than doing nothing, because the tactical AI underneath is at least reacting to
+        /// the present.
+        /// </summary>
+        private static void Consume(Taskforce tf, BrainState state, ForceOrderSet ready)
+        {
+            var age = GameTime.time - ready.DerivedFromTime;
+            var limit = Plugin.MaxOrderAgeSeconds;
+
+            if (limit > 0f && age > limit)
+            {
+                Plugin.Log.LogWarning(
+                    $"[orders] discarding {ready.Orders.Count} order(s) for {tf._nameInMissionFile}: " +
+                    $"derived from a picture {age:F0}s old (limit {limit:F0}s). " +
+                    "Lower time compression or raise MaxOrderAgeSeconds.");
+                return;
+            }
+
+            var accepted = OrderExecutor.Apply(tf, ready);
+
+            // Only orders that took effect become standing. Replaying a rejected order
+            // would tell the brain a sunk ship is still under way.
+            foreach (var order in accepted)
+                state.StandingOrders[order.UnitId + ":" + order.Kind] = order;
+        }
+
+        /// <summary>
+        /// Gives the picture a memory: what was ordered previously, and what has been lost
         /// since. Without this the brain re-derives everything each tick and cannot tell
         /// that it is losing the battle.
         /// </summary>
@@ -166,7 +199,18 @@ namespace SeaPowerForceAI
             }
 
             picture.TotalLosses = state.TotalLosses;
-            picture.StandingOrders = state.StandingOrders;
+
+            // Drop standing orders for units that no longer exist, then replay the rest.
+            var live = new HashSet<int>();
+            foreach (var u in picture.OwnUnits) live.Add(u.Id);
+
+            var stale = new List<string>();
+            foreach (var pair in state.StandingOrders)
+            {
+                if (!live.Contains(pair.Value.UnitId)) stale.Add(pair.Key);
+                else picture.StandingOrders.Add(pair.Value);
+            }
+            foreach (var key in stale) state.StandingOrders.Remove(key);
 
             // Re-seed the roster for the next diff.
             state.KnownUnits.Clear();

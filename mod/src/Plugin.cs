@@ -34,6 +34,10 @@ namespace SeaPowerForceAI
         private static ConfigEntry<string> _cfgSidecarEndpoint;
         private static ConfigEntry<int> _cfgSidecarTimeoutMs;
         private static ConfigEntry<int> _cfgMinRequestGapMs;
+        private static ConfigEntry<float> _cfgMaxOrderAgeSeconds;
+
+        internal static float MaxOrderAgeSeconds =>
+            _cfgMaxOrderAgeSeconds != null ? _cfgMaxOrderAgeSeconds.Value : 180f;
 
         public enum BrainType
         {
@@ -121,6 +125,16 @@ namespace SeaPowerForceAI
                     "together they can burst past a provider rate limit. 4000ms holds the " +
                     "total at or under 15/min, inside OpenRouter's 20/min new-account cap.",
                     new AcceptableValueRange<int>(0, 120000)));
+
+            _cfgMaxOrderAgeSeconds = _config.Bind("Brain", "MaxOrderAgeSeconds", 180f,
+                new ConfigDescription(
+                    "Discard a decision if the picture it was derived from is older than " +
+                    "this many GAME seconds by the time it arrives. A network round trip " +
+                    "takes real seconds, so time compression makes decisions arrive stale - " +
+                    "at 10x, a 45s decision is 450 game-seconds out of date. Acting on a " +
+                    "stale picture is worse than not acting, because the tactical AI " +
+                    "underneath is still reacting to the present. 0 disables the check.",
+                    new AcceptableValueRange<float>(0f, 3600f)));
         }
 
         /// <summary>
