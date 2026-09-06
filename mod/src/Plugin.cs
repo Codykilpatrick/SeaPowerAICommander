@@ -36,9 +36,13 @@ namespace SeaPowerForceAI
         private static ConfigEntry<int> _cfgMinRequestGapMs;
         private static ConfigEntry<float> _cfgMaxPositionalOrderAgeSeconds;
         private static ConfigEntry<float> _cfgMaxPostureOrderAgeSeconds;
+        private static ConfigEntry<int> _cfgMaxContactsInPicture;
+
+        internal static int MaxContactsInPicture =>
+            _cfgMaxContactsInPicture != null ? _cfgMaxContactsInPicture.Value : 25;
 
         internal static float MaxPositionalOrderAgeSeconds =>
-            _cfgMaxPositionalOrderAgeSeconds != null ? _cfgMaxPositionalOrderAgeSeconds.Value : 240f;
+            _cfgMaxPositionalOrderAgeSeconds != null ? _cfgMaxPositionalOrderAgeSeconds.Value : 400f;
 
         internal static float MaxPostureOrderAgeSeconds =>
             _cfgMaxPostureOrderAgeSeconds != null ? _cfgMaxPostureOrderAgeSeconds.Value : 0f;
@@ -115,10 +119,13 @@ namespace SeaPowerForceAI
             _cfgSidecarEndpoint = _config.Bind("Brain", "SidecarEndpoint", "http://127.0.0.1:8787/",
                 "Where the sidecar listens. Loopback only - do not point this off-machine.");
 
-            _cfgSidecarTimeoutMs = _config.Bind("Brain", "SidecarTimeoutMs", 90000,
+            _cfgSidecarTimeoutMs = _config.Bind("Brain", "SidecarTimeoutMs", 150000,
                 new ConfigDescription(
                     "How long to wait for a decision before abandoning that cycle. Runs on a " +
-                    "background thread, so this never stalls the game.",
+                    "background thread, so this never stalls the game. Raised from 90s after " +
+                    "a live run lost a whole decision to the timeout as the picture grew; " +
+                    "an abandoned cycle is worse than a late one, since the tactical AI " +
+                    "carries on either way.",
                     new AcceptableValueRange<int>(1000, 600000)));
 
             _cfgMinRequestGapMs = _config.Bind("Brain", "MinRequestGapMs", 4000,
@@ -130,7 +137,17 @@ namespace SeaPowerForceAI
                     "total at or under 15/min, inside OpenRouter's 20/min new-account cap.",
                     new AcceptableValueRange<int>(0, 120000)));
 
-            _cfgMaxPositionalOrderAgeSeconds = _config.Bind("Brain", "MaxPositionalOrderAgeSeconds", 240f,
+            _cfgMaxContactsInPicture = _config.Bind("Brain", "MaxContactsInPicture", 25,
+                new ConfigDescription(
+                    "Most contacts to include in one picture. Decision latency tracks " +
+                    "payload size and payload tracks contact count, so an unbounded " +
+                    "picture in a large scenario pushes decisions past the point where " +
+                    "they still arrive usefully. Contacts are ranked by tactical " +
+                    "relevance - hostile, identified and close first, dormant last - so " +
+                    "what survives the cap is what matters. 0 removes the cap.",
+                    new AcceptableValueRange<int>(0, 200)));
+
+            _cfgMaxPositionalOrderAgeSeconds = _config.Bind("Brain", "MaxPositionalOrderAgeSeconds", 400f,
                 new ConfigDescription(
                     "Drop POSITION-DEPENDENT orders (MoveTo) if the picture they came from " +
                     "is older than this many GAME seconds on arrival. A waypoint derived " +

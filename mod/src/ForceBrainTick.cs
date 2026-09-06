@@ -269,8 +269,30 @@ namespace SeaPowerForceAI
             var stale = new List<string>();
             foreach (var pair in state.StandingOrders)
             {
-                if (!live.Contains(pair.Value.UnitId)) stale.Add(pair.Key);
-                else picture.StandingOrders.Add(pair.Value);
+                if (!live.Contains(pair.Value.UnitId))
+                {
+                    stale.Add(pair.Key);
+                    continue;
+                }
+
+                // Replay what is in force, not the prose that justified it. The commander
+                // wrote those reasons itself and does not need them read back; at a dozen
+                // standing orders they were a meaningful slice of a payload whose growth
+                // has been tracking decision latency.
+                var o = pair.Value;
+                picture.StandingOrders.Add(new ForceOrder
+                {
+                    Kind = o.Kind,
+                    UnitId = o.UnitId,
+                    Latitude = o.Latitude,
+                    Longitude = o.Longitude,
+                    SpeedKnots = o.SpeedKnots,
+                    WeaponStatus = o.WeaponStatus,
+                    TargetContactId = o.TargetContactId,
+                    Salvo = o.Salvo,
+                    CoordinationGroup = o.CoordinationGroup,
+                    Reason = null,
+                });
             }
             foreach (var key in stale) state.StandingOrders.Remove(key);
 

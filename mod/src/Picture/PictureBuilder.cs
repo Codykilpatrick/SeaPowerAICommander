@@ -362,12 +362,54 @@ namespace SeaPowerForceAI.Picture
                 picture.Contacts.Add(contact);
             }
 
+            var beforeCap = picture.Contacts.Count;
+            CapContacts(picture);
+
             // One line that fully accounts for every plotting-table entry, so a zero
             // contact count is always explainable without another mission run.
             Plugin.Log.LogInfo(
                 $"[plot] {picture.TaskforceName}: {vehicles.Count} entries -> " +
-                $"{picture.Contacts.Count} contacts " +
-                $"(skipped: own={skipOwn}, noObject={skipNoObject}, nullVehicle={skipNullVehicle})");
+                $"{beforeCap} contacts" +
+                (picture.Contacts.Count < beforeCap ? $" -> {picture.Contacts.Count} after cap" : "") +
+                $" (skipped: own={skipOwn}, noObject={skipNoObject}, nullVehicle={skipNullVehicle})");
+        }
+
+        /// <summary>
+        /// Keeps the picture bounded regardless of scenario size.
+        ///
+        /// Decision latency tracks payload, and payload tracks contact count - a large
+        /// scenario would otherwise push decisions past the point where they arrive
+        /// usefully, or past the timeout entirely. A commander that must sustain 5x cannot
+        /// be handed an unbounded picture.
+        ///
+        /// What survives the cap is chosen by tactical relevance, not arbitrarily: a
+        /// hostile you have identified and that is close matters more than a distant
+        /// unknown, and a dormant track matters least of all.
+        /// </summary>
+        private static void CapContacts(TacticalPicture picture)
+        {
+            var cap = Plugin.MaxContactsInPicture;
+            if (cap <= 0 || picture.Contacts.Count <= cap) return;
+
+            picture.Contacts.Sort((a, b) => Relevance(b).CompareTo(Relevance(a)));
+            picture.Contacts.RemoveRange(cap, picture.Contacts.Count - cap);
+        }
+
+        private static double Relevance(Contact c)
+        {
+            var score = 0.0;
+
+            if (c.Relationship == "Hostile") score += 1000.0;
+            if (c.Identified) score += 400.0;
+            else if (c.Classified) score += 200.0;
+            if (c.Dormant) score -= 300.0;
+
+            // Closer is more pressing. Bearing-only holds have no range to judge by, so
+            // they sit mid-table rather than being dropped for lack of a number.
+            if (c.RangeFromForceNM > 0f) score += 500.0 / (1.0 + c.RangeFromForceNM);
+            else score += 50.0;
+
+            return score;
         }
 
         private static void ApplyPosition(Contact contact, Vehicle veh)
