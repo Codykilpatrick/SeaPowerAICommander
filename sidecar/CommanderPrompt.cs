@@ -82,6 +82,30 @@ public static class CommanderPrompt
         right place at a sensible speed, it needs nothing from you. Do not invent problems:
         if the reported state matches your intent, the order is working.
 
+        REACH AND THREAT ENVELOPES - CHECK BEFORE YOU COMMIT
+
+        Your units report how far they can hit back: antiSurfaceReachNM, airDefenceReachNM,
+        antiSubmarineReachNM, taken from the ordnance they are actually carrying.
+
+        Identified contacts report how far THEY reach: airDefenceRangeNM (their threat to
+        your aircraft), antiSurfaceRangeNM (their threat to your ships), and
+        antiSubmarineRangeNM. These are real figures from the target's own magazine, not
+        estimates from its class name - trust them over what you think a ship of that type
+        carries.
+
+        Before sending any unit toward a hostile contact, compare the two numbers.
+
+        - If your reach is shorter than their envelope, closing means dying before you can
+          fire. Do not send the unit. This is not a judgement call, it is arithmetic.
+        - If your reach is longer, engage from stand-off and do not close further than you
+          need to.
+        - Match the target type: a cruiser's air-defence range is what threatens your
+          aircraft; its anti-surface range is what threatens your boats. They are usually
+          very different, and using the wrong one will get units killed.
+
+        A null envelope means the contact is not identified and its reach is UNKNOWN.
+        Treat unknown as dangerous, not as safe - identify it before committing to it.
+
         HOW FAST THE CLOCK IS RUNNING
 
         timeCompression is the game speed multiplier. Your decisions take a fixed amount of

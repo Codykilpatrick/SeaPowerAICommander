@@ -83,6 +83,7 @@ namespace SeaPowerForceAI.Picture
 
                 ApplyCommandedSpeed(unit, obj);
                 ApplyRoute(unit, obj);
+                ApplyReach(unit, obj);
 
                 picture.OwnUnits.Add(unit);
             }
@@ -137,6 +138,78 @@ namespace SeaPowerForceAI.Picture
             }
         }
 
+        /// <summary>Engine distance units to nautical miles - the game's own constant.</summary>
+        private const float UnityToNauticalMiles = 0.036285132f;
+
+        /// <summary>
+        /// Longest reach an object has against a given target type, from the ordnance it
+        /// is actually carrying, in nautical miles.
+        ///
+        /// Mirrors the game's own AirStrike.GetMaxAirDefenseRangeNM, generalised beyond
+        /// AAW - one figure would mislead, because a cruiser's SAM envelope is the threat
+        /// to aircraft while its Harpoons are the threat to a fast attack craft, and those
+        /// are wildly different distances.
+        /// </summary>
+        private static float MaxReachNM(ObjectBase obj, Ammunition.Target against)
+        {
+            if (obj == null || obj.AmmunitionAmountDictionary == null) return 0f;
+
+            var best = 0f;
+            foreach (var entry in obj.AmmunitionAmountDictionary)
+            {
+                if (entry.Value < 1) continue;
+
+                var ammo = obj.getAmmunitionByName(entry.Key);
+                var ap = ammo != null ? ammo._ap : null;
+                if (ap == null) continue;
+
+                if (ap._targetType != against && ap._secondaryTargetType != against) continue;
+
+                var range = ap._launchRangesInUnity.y;
+                if (range > best) best = range;
+            }
+
+            return Finite(best * UnityToNauticalMiles);
+        }
+
+        private static void ApplyReach(OwnUnit unit, ObjectBase obj)
+        {
+            try
+            {
+                unit.AntiSurfaceReachNM = MaxReachNM(obj, Ammunition.Target.ASuW);
+                unit.AirDefenceReachNM = MaxReachNM(obj, Ammunition.Target.AAW);
+                unit.AntiSubmarineReachNM = MaxReachNM(obj, Ammunition.Target.ASW);
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.LogWarning($"[picture] reach unreadable for {unit.Name}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Threat envelopes for a contact - but only once it is identified.
+        ///
+        /// Reading a contact's magazine is reading ground truth, so this is gated on
+        /// identification. That is exactly what identification buys you: the class is
+        /// known, and a threat library follows. An unidentified contact reports null,
+        /// which should make it more frightening rather than less.
+        /// </summary>
+        private static void ApplyThreatEnvelope(Contact contact, Vehicle veh, ObjectBase obj)
+        {
+            if (!contact.Identified) return;
+
+            try
+            {
+                contact.AirDefenceRangeNM = MaxReachNM(obj, Ammunition.Target.AAW);
+                contact.AntiSurfaceRangeNM = MaxReachNM(obj, Ammunition.Target.ASuW);
+                contact.AntiSubmarineRangeNM = MaxReachNM(obj, Ammunition.Target.ASW);
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.LogWarning($"[picture] threat envelope unreadable for contact {contact.Id}: {ex.Message}");
+            }
+        }
+
         private static void AddContacts(TacticalPicture picture, Taskforce tf)
         {
             var plot = tf.PlottingTable;
@@ -184,6 +257,7 @@ namespace SeaPowerForceAI.Picture
 
                 ApplyPosition(contact, veh);
                 ApplyVelocity(contact, veh);
+                ApplyThreatEnvelope(contact, veh, obj);
 
                 picture.Contacts.Add(contact);
             }

@@ -104,6 +104,21 @@ namespace SeaPowerForceAI.Picture
         public double? NextWaypointLatitude;
         public double? NextWaypointLongitude;
 
+        // ---- Reach ----
+        //
+        // How far this unit can hit back, by target type, from the ordnance it is
+        // actually carrying. Paired with a contact's threat envelope this turns
+        // "can I survive committing to this?" from recall into arithmetic.
+
+        /// <summary>Longest reach against a surface ship, in nautical miles. 0 if none.</summary>
+        public float AntiSurfaceReachNM;
+
+        /// <summary>Longest reach against an aircraft, in nautical miles. 0 if none.</summary>
+        public float AirDefenceReachNM;
+
+        /// <summary>Longest reach against a submarine, in nautical miles. 0 if none.</summary>
+        public float AntiSubmarineReachNM;
+
         /// <summary>Vessel / Submarine / Aircraft / Helicopter / LandUnit.</summary>
         public string Category;
 
@@ -160,5 +175,24 @@ namespace SeaPowerForceAI.Picture
 
         /// <summary>Estimated course. Null if unknown.</summary>
         public float? CourseDeg;
+
+        // ---- Threat envelopes ----
+        //
+        // Populated ONLY when the contact is identified. That is what identification
+        // means: you know the class, and a real navy carries a threat library for it.
+        // Null means unknown, which should make a contact MORE frightening, not less.
+        //
+        // Split by target type because one number would mislead. A cruiser's 40nm SAM
+        // envelope is the threat to aircraft; its Harpoons are the threat to a fast
+        // attack craft, and those are wildly different distances.
+
+        /// <summary>How far this contact can reach an aircraft, in nautical miles.</summary>
+        public float? AirDefenceRangeNM;
+
+        /// <summary>How far this contact can reach a surface ship, in nautical miles.</summary>
+        public float? AntiSurfaceRangeNM;
+
+        /// <summary>How far this contact can reach a submarine, in nautical miles.</summary>
+        public float? AntiSubmarineRangeNM;
     }
 }
