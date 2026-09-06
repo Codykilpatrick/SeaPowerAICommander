@@ -38,6 +38,10 @@ namespace SeaPowerForceAI
         private static ConfigEntry<float> _cfgMaxPostureOrderAgeSeconds;
         private static ConfigEntry<int> _cfgMaxContactsInPicture;
         private static ConfigEntry<string> _cfgForceObjective;
+        private static ConfigEntry<bool> _cfgLogUnitState;
+
+        internal static bool LogUnitStateEnabled =>
+            _cfgLogUnitState != null && _cfgLogUnitState.Value;
 
         internal static string ForceObjective =>
             _cfgForceObjective != null ? _cfgForceObjective.Value : string.Empty;
@@ -110,6 +114,14 @@ namespace SeaPowerForceAI
             _cfgDrivePlayerTaskforce = _config.Bind("General", "DrivePlayerTaskforce", false,
                 "Also run the brain on the player's own task force. Off by default - useful only " +
                 "for testing what the brain would do with your fleet.");
+
+            _cfgLogUnitState = _config.Bind("Debug", "LogUnitState", true,
+                "One readable line per own unit and per contact each decision: formation " +
+                "membership, route, speed, weapons, reach - and for contacts, what is known " +
+                "and whether a threat envelope is available. Far easier to read than the " +
+                "full JSON dump, and it answers the question that keeps recurring: which " +
+                "units can actually be given orders, and what did the commander know when " +
+                "it decided.");
 
             _cfgDumpPictureJson = _config.Bind("Debug", "DumpPictureJson", false,
                 "Write the full serialized tactical picture to the log at debug level each tick. " +

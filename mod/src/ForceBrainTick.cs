@@ -308,10 +308,63 @@ namespace SeaPowerForceAI
                 };
             }
 
+            LogUnitState(picture);
             VerifyStandingOrders(picture);
 
             state.LastDecisionTime = now;
             state.Seeded = true;
+        }
+
+        /// <summary>
+        /// One compact line per unit: what it is, whether the formation owns it, where it
+        /// is going and how fast.
+        ///
+        /// Readable in a way the full JSON dump is not, and aimed at the question that
+        /// keeps coming up - which units can actually be given orders. A formation
+        /// follower accepts movement orders and ignores them, so its presence here
+        /// explains an order that appeared to vanish.
+        /// </summary>
+        private static void LogUnitState(TacticalPicture picture)
+        {
+            if (!Plugin.LogUnitStateEnabled) return;
+
+            foreach (var u in picture.OwnUnits)
+            {
+                var formation = u.InFormation
+                    ? (u.ActsIndependentlyInFormation ? "formation(independent)" : "FORMATION-FOLLOWER")
+                    : "independent";
+
+                var route = u.WaypointsRemaining > 0
+                    ? $"{u.WaypointsRemaining}wp"
+                    : "no-route";
+
+                Plugin.Log.LogInfo(
+                    $"[units] {u.Name} ({u.Id}) {u.Category} {formation} {route} " +
+                    $"{u.SpeedKnots:F0}/{u.CommandedSpeedKnots:F0}kt max{u.MaxSpeedKnots:F0} " +
+                    $"weapons={u.WeaponStatus} reach asuw={u.AntiSurfaceReachNM:F1} aaw={u.AirDefenceReachNM:F1}");
+            }
+
+            foreach (var c in picture.Contacts)
+            {
+                // What the commander actually knows about this contact, in the terms it
+                // reasons in - identification state is what gates the threat envelope, so
+                // an unidentified contact showing "envelope unknown" explains why a
+                // range check did not happen.
+                var id = c.Identified ? "IDENTIFIED" : (c.Classified ? "classified" : "unknown");
+                var pos = c.Latitude.HasValue ? $"{c.RangeFromForceNM:F0}nm" : "bearing-only";
+
+                var envelope = c.AirDefenceRangeNM.HasValue
+                    ? $"aaw={c.AirDefenceRangeNM:F0} asuw={c.AntiSurfaceRangeNM:F0}"
+                    : "envelope unknown";
+
+                var terrain = c.TerrainOnBearingM.HasValue
+                    ? (c.TerrainOnBearingM.Value > 0f ? $"terrain {c.TerrainOnBearingM:F0}m" : "open water")
+                    : "terrain unsampled";
+
+                Plugin.Log.LogInfo(
+                    $"[contact] {c.Id} {c.Class} {id}{(c.Dormant ? " DORMANT" : "")} {pos} " +
+                    $"{c.Relationship} sensors={c.DetectingSensors} {envelope} {terrain}");
+            }
         }
 
         /// <summary>

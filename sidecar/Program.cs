@@ -26,8 +26,11 @@ if (string.IsNullOrWhiteSpace(apiKey))
 
 var model = Environment.GetEnvironmentVariable("FORCEAI_MODEL") ?? DefaultModel;
 var prefix = Environment.GetEnvironmentVariable("FORCEAI_PREFIX") ?? DefaultPrefix;
+// Matches the mod's SidecarTimeoutMs default. There are two timeouts on this path -
+// the mod waiting on the sidecar, and the sidecar waiting on OpenRouter - and raising
+// only the first left decisions still being abandoned at 90 seconds.
 var timeout = TimeSpan.FromSeconds(
-    int.TryParse(Environment.GetEnvironmentVariable("FORCEAI_TIMEOUT_SECONDS"), out var t) ? t : 90);
+    int.TryParse(Environment.GetEnvironmentVariable("FORCEAI_TIMEOUT_SECONDS"), out var t) ? t : 150);
 
 using var client = new OpenRouterClient(apiKey, model, timeout);
 
