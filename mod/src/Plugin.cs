@@ -37,6 +37,10 @@ namespace SeaPowerForceAI
         private static ConfigEntry<float> _cfgMaxPositionalOrderAgeSeconds;
         private static ConfigEntry<float> _cfgMaxPostureOrderAgeSeconds;
         private static ConfigEntry<int> _cfgMaxContactsInPicture;
+        private static ConfigEntry<string> _cfgForceObjective;
+
+        internal static string ForceObjective =>
+            _cfgForceObjective != null ? _cfgForceObjective.Value : string.Empty;
 
         internal static int MaxContactsInPicture =>
             _cfgMaxContactsInPicture != null ? _cfgMaxContactsInPicture.Value : 25;
@@ -136,6 +140,18 @@ namespace SeaPowerForceAI
                     "together they can burst past a provider rate limit. 4000ms holds the " +
                     "total at or under 15/min, inside OpenRouter's 20/min new-account cap.",
                     new AcceptableValueRange<int>(0, 120000)));
+
+            _cfgForceObjective = _config.Bind("Brain", "ForceObjective",
+                "Contest this area and prevent hostile forces operating freely in it. " +
+                "Preserve your force where you can, but accept risk in proportion to what " +
+                "you can actually achieve - withdrawing intact while achieving nothing is " +
+                "a failure, not a success.",
+                "What the AI force is trying to achieve. Set this per scenario - it is the " +
+                "single biggest influence on how the commander behaves. Given no objective " +
+                "it optimises purely for survival, which means withdrawing every time it " +
+                "is outranged, however good its tactical reasoning. This is deliberately " +
+                "NOT taken from the mission's own objectives, which are written for the " +
+                "player and would be the opposing side's plan.");
 
             _cfgMaxContactsInPicture = _config.Bind("Brain", "MaxContactsInPicture", 25,
                 new ConfigDescription(

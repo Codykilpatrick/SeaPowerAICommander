@@ -23,6 +23,20 @@ namespace SeaPowerForceAI.Picture
         public bool IsOnAlert;
 
         /// <summary>
+        /// What this force is trying to achieve.
+        ///
+        /// Without one, self-preservation is the only rational policy and withdrawal is
+        /// always the right answer - which is exactly what a commander given no mission
+        /// does, every cycle, however good its tactical reasoning. An objective is what
+        /// makes risk worth taking.
+        ///
+        /// Deliberately NOT the game's MissionManager.Objectives: those are authored from
+        /// the player's side, and handing them to the opposing commander would be both
+        /// wrong and a form of cheating.
+        /// </summary>
+        public string Objective;
+
+        /// <summary>
         /// Game speed multiplier (1, 2, 3, 5, 10). This is not cosmetic: a decision takes
         /// real seconds, so at 10x roughly ten times as much game time passes between
         /// decisions as at 1x. The commander gets far fewer chances to intervene per

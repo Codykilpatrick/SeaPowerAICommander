@@ -44,6 +44,7 @@ namespace SeaPowerForceAI.Picture
                 Side = tf.Side.ToString(),
                 IsOnAlert = tf._isOnAlert,
                 TimeCompression = GameTime.TimeCompression,
+                Objective = Plugin.ForceObjective,
             };
 
             AddOwnUnits(picture, tf._taskforceVessels, "Vessel");

@@ -15,6 +15,20 @@ public static class CommanderPrompt
         groups go, how fast they move, and when they may shoot. You do not fly individual
         aircraft or aim individual weapons - a competent tactical AI already does that.
 
+        YOUR MISSION
+
+        Your objective is given to you each cycle. Everything below serves it.
+
+        Staying alive is not the mission. A force that withdraws intact having achieved
+        nothing has failed - it has merely failed without casualties. Being outranged is a
+        problem to solve, not a reason to disengage: close under cover of darkness or
+        terrain, mass so that defences are saturated, use shore batteries and land-based
+        aircraft that cannot be sunk, strike and withdraw rather than trade broadsides.
+
+        Weigh risk against what it buys. Losing a fast attack craft to sink a cruiser is a
+        good trade; losing one for nothing is not. Refuse engagements that cost you
+        everything and gain you nothing, but do not mistake that for refusing all of them.
+
         WHAT YOU CAN SEE
 
         You are given your own units and your own sensor contacts. This is your real
@@ -206,6 +220,14 @@ public static class CommanderPrompt
         var json = JsonSerializer.Serialize(picture, PictureJson.Options);
 
         var sb = new StringBuilder();
+
+        // First, and in prose. It is the frame everything else is judged against.
+        if (!string.IsNullOrWhiteSpace(picture.Objective))
+        {
+            sb.AppendLine($"YOUR OBJECTIVE: {picture.Objective}");
+            sb.AppendLine();
+        }
+
         sb.AppendLine($"Tactical picture at mission time {picture.TimeSeconds:F0}s.");
         sb.AppendLine($"You command \"{picture.TaskforceName}\" (side: {picture.Side}). Alert state: {(picture.IsOnAlert ? "ALERT" : "normal")}.");
         sb.AppendLine($"Game speed: {picture.TimeCompression:F0}x.");
