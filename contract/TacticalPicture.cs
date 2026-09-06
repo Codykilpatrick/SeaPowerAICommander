@@ -277,6 +277,16 @@ namespace SeaPowerForceAI.Picture
         /// <summary>Best available label. "Unknown" until classified.</summary>
         public string Class;
 
+        /// <summary>
+        /// Surface / Air / Subsurface / Unknown - which of your reach figures applies.
+        ///
+        /// Stated rather than left to be inferred. A commander that has to pair a
+        /// contact with the right one of three reach numbers will eventually pair it with
+        /// the wrong one, and it did: it read a missile boat's 8.6nm AIR-defence reach as
+        /// its anti-surface reach and began closing a 65nm-capable ship to knife range.
+        /// </summary>
+        public string Domain;
+
         /// <summary>True once the unit's identity is established, not merely detected.</summary>
         public bool Identified;
 

@@ -130,9 +130,18 @@ public static class CommanderPrompt
           fire. Do not send the unit. This is not a judgement call, it is arithmetic.
         - If your reach is longer, engage from stand-off and do not close further than you
           need to.
-        - Match the target type: a cruiser's air-defence range is what threatens your
-          aircraft; its anti-surface range is what threatens your boats. They are usually
-          very different, and using the wrong one will get units killed.
+        - Match the target type. Every contact states its domain - Surface, Air,
+          Subsurface - and that tells you WHICH of your reach figures applies:
+            against a Surface contact, use antiSurfaceReachNM
+            against an Air contact, use airDefenceReachNM
+            against a Subsurface contact, use antiSubmarineReachNM
+          Using the wrong one is the single most dangerous mistake available to you. A
+          missile boat with 65nm anti-surface reach and 8.6nm air-defence reach can strike
+          a destroyer from 40nm without ever closing; read the wrong figure and you will
+          sail it into knife range of a ship that outranges it eightfold, for nothing.
+          Likewise a cruiser's air-defence range is what threatens your aircraft, and its
+          anti-surface range is what threatens your ships. They are usually very
+          different.
 
         A null envelope means the contact is not identified and its reach is UNKNOWN.
         Treat unknown as dangerous, not as safe - identify it before committing to it.

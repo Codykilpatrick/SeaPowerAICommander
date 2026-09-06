@@ -528,6 +528,7 @@ namespace SeaPowerForceAI.Picture
                 {
                     Id = obj.UniqueID,
                     Class = ReadClass(veh),
+                    Domain = ReadDomain(veh, obj),
                     Identified = veh.Identified != null && veh.Identified.Value,
                     Classified = veh.IsClassified,
                     Dormant = veh.IsDormant != null && veh.IsDormant.Value,
@@ -621,6 +622,36 @@ namespace SeaPowerForceAI.Picture
             var course = Mathf.Atan2(horizontal.x, horizontal.z) * Mathf.Rad2Deg;
             if (course < 0f) course += 360f;
             contact.CourseDeg = Finite(course);
+        }
+
+        /// <summary>
+        /// Which domain the contact is in, and therefore which reach figure applies to it.
+        ///
+        /// Taken from the classified sensor type where one exists - that is what detection
+        /// actually establishes - and only falls back to the object when the track has
+        /// been classified, so this stays inside what the task force has genuinely worked
+        /// out about the contact.
+        /// </summary>
+        private static string ReadDomain(Vehicle veh, ObjectBase obj)
+        {
+            try
+            {
+                // Classification is precisely the point at which a task force establishes
+                // what KIND of thing a contact is, so reading the domain is fair here and
+                // withheld before it.
+                if (!veh.IsClassified) return "Unknown";
+
+                if (obj.IsAirUnit) return "Air";
+                if (obj is Submarine) return "Subsurface";
+                if (obj.IsSurfaceUnit || obj is Vessel) return "Surface";
+                if (obj is LandUnit) return "Land";
+            }
+            catch (Exception)
+            {
+                // Fall through to Unknown rather than lose the whole contact.
+            }
+
+            return "Unknown";
         }
 
         private static string ReadClass(Vehicle veh)
