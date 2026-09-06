@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using HarmonyLib;
 using SeaPower;
@@ -35,6 +36,9 @@ namespace SeaPowerForceAI
         private static readonly AccessTools.FieldRef<TaskForceAI, Taskforce> TaskforceOf = ResolveTaskforceField();
 
         private static bool _fieldMissingLogged;
+
+        /// <summary>One frame at 60fps. Main-thread work above this is visible as a hitch.</summary>
+        private const double FrameBudgetMs = 16.0;
 
         private static AccessTools.FieldRef<TaskForceAI, Taskforce> ResolveTaskforceField()
         {
@@ -138,7 +142,26 @@ namespace SeaPowerForceAI
 
             state.NextSubmitTime = now + Plugin.TickIntervalSeconds;
 
+            // Everything from here runs on the Unity thread, so it is the only part of
+            // this mod that can cause a frame hitch. Measured rather than assumed.
+            var buildWatch = Stopwatch.StartNew();
             var picture = PictureBuilder.Build(tf);
+            buildWatch.Stop();
+
+            var buildMs = buildWatch.Elapsed.TotalMilliseconds;
+            if (buildMs > FrameBudgetMs)
+            {
+                Plugin.Log.LogWarning(
+                    $"[perf] {picture.TaskforceName}: picture took {buildMs:F1}ms on the game thread " +
+                    $"({picture.OwnUnits.Count} units, {picture.PlotEntries} plot entries) - " +
+                    "over one frame at 60fps, this is visible as a hitch.");
+            }
+            else
+            {
+                Plugin.Log.LogInfo(
+                    $"[perf] {picture.TaskforceName}: picture built in {buildMs:F1}ms " +
+                    $"({picture.OwnUnits.Count} units, {picture.PlotEntries} plot entries)");
+            }
 
             // Nothing to command. Missions carry task forces that hold no units at all
             // (an empty Neutral side, for one), and asking a model what to do with an

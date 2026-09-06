@@ -101,19 +101,10 @@ namespace SeaPowerForceAI
 
             _inFlight = true;
 
-            string body;
-            try
-            {
-                body = JsonConvert.SerializeObject(picture, WireSettings);
-            }
-            catch (Exception ex)
-            {
-                Plugin.Log.LogError($"[brain] could not serialize picture: {ex.Message}");
-                _inFlight = false;
-                return;
-            }
-
-            var thread = new Thread(() => Work(body, picture.TaskforceName))
+            // Serialise on the worker, not here. The picture is a detached snapshot of
+            // plain objects that nothing touches after Submit, so there is no reason to
+            // spend game-thread time on it.
+            var thread = new Thread(() => Work(picture))
             {
                 IsBackground = true,
                 Name = "ForceAI-Brain",
@@ -135,11 +126,16 @@ namespace SeaPowerForceAI
             return true;
         }
 
-        private void Work(string body, string taskforceName)
+        private void Work(TacticalPicture picture)
         {
+            var taskforceName = picture.TaskforceName;
             var startedUtc = DateTime.UtcNow;
             try
             {
+                var serializeStarted = DateTime.UtcNow;
+                var body = JsonConvert.SerializeObject(picture, WireSettings);
+                var serializeMs = (DateTime.UtcNow - serializeStarted).TotalMilliseconds;
+
                 var request = (HttpWebRequest)WebRequest.Create(_endpoint);
                 request.Method = "POST";
                 request.ContentType = "application/json";
@@ -168,7 +164,8 @@ namespace SeaPowerForceAI
                 var seconds = (DateTime.UtcNow - startedUtc).TotalSeconds;
                 Plugin.Log.LogInfo(
                     $"[brain] {taskforceName}: decision returned in {seconds:F1}s real " +
-                    $"({set.Orders.Count} order(s))");
+                    $"({set.Orders.Count} order(s), {body.Length / 1024f:F1}KB payload, " +
+                    $"serialize {serializeMs:F1}ms off-thread)");
 
                 _ready = set;
             }
