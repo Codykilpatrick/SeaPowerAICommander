@@ -189,6 +189,16 @@ namespace SeaPowerForceAI.Picture
         public bool InFormation;
 
         /// <summary>
+        /// True when this unit LEADS its formation.
+        ///
+        /// InFormation is true for the leader as well as its followers, so it alone does
+        /// not say whether a unit can be ordered. The leader holds the route and takes
+        /// movement orders; the followers take station on it. Order the leader to move a
+        /// formation.
+        /// </summary>
+        public bool IsFormationLeader;
+
+        /// <summary>
         /// True when the unit manoeuvres on its own account despite being in a formation.
         /// Such a unit does respond to individual movement orders.
         /// </summary>

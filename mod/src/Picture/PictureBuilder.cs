@@ -165,10 +165,17 @@ namespace SeaPowerForceAI.Picture
                         && line.IndexOf('=') > 0
                         && !line.StartsWith(" ");
 
+                    // Ending the description must NOT consume this line - it is the next
+                    // key, and swallowing it here silently dropped every StartMessage.
                     if (isNextKey) inDescription = false;
-                    else { if (line.Length > 0) description.Append(' ').Append(line); continue; }
+                    else
+                    {
+                        if (line.Length > 0) description.Append(' ').Append(line);
+                        continue;
+                    }
                 }
-                else if (line.IndexOf("StartMessage=", StringComparison.OrdinalIgnoreCase) > 0)
+
+                if (line.IndexOf("StartMessage=", StringComparison.OrdinalIgnoreCase) > 0)
                 {
                     // "Taskforce1StartMessage=Hormuz|Commander, you need to..." - the part
                     // before the pipe is a title, the rest is the orders.
@@ -266,6 +273,7 @@ namespace SeaPowerForceAI.Picture
                     SpeedKnots = Finite(obj.getVelocityInKnots()),
                     WeaponStatus = obj._weaponStatus.ToString(),
                     InFormation = obj.InFormation != null && obj.InFormation.Value,
+                    IsFormationLeader = obj.IsFormationLeader,
                     ActsIndependentlyInFormation =
                         obj.ActsIndependentlyInFormation != null && obj.ActsIndependentlyInFormation.Value,
                 };

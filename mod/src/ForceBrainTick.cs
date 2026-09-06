@@ -330,9 +330,13 @@ namespace SeaPowerForceAI
 
             foreach (var u in picture.OwnUnits)
             {
-                var formation = u.InFormation
-                    ? (u.ActsIndependentlyInFormation ? "formation(independent)" : "FORMATION-FOLLOWER")
-                    : "independent";
+                // InFormation alone does not distinguish a leader from a follower - it is
+                // true for both - so a leader was being reported as untaskable while
+                // visibly holding its own route.
+                var formation = !u.InFormation ? "independent"
+                    : u.IsFormationLeader ? "FORMATION-LEADER"
+                    : u.ActsIndependentlyInFormation ? "formation(independent)"
+                    : "formation-follower";
 
                 var route = u.WaypointsRemaining > 0
                     ? $"{u.WaypointsRemaining}wp"
@@ -396,7 +400,7 @@ namespace SeaPowerForceAI
                         // legitimately holds no waypoints of its own, so an empty route is
                         // not evidence the order failed - though it does mean the order
                         // probably achieved nothing, which the commander is now told.
-                        if (unit.InFormation && !unit.ActsIndependentlyInFormation)
+                        if (unit.InFormation && !unit.IsFormationLeader && !unit.ActsIndependentlyInFormation)
                         {
                             ignored++;
                             Plugin.Log.LogWarning(

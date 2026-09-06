@@ -92,11 +92,12 @@ public static class CommanderPrompt
           headed. A unit with waypointsRemaining greater than zero is already under way -
           check where to before redirecting it.
 
-        - inFormation says the unit is stationed in a formation. A formation FOLLOWER takes
-          its movement from the leader: a MoveTo aimed at it individually is accepted and
-          then quietly does nothing, and it will keep reporting no waypoints of its own.
-          To move a formation, order its LEADER - the one whose waypoints are set - or
-          accept that the follower will not go where you sent it.
+        - inFormation says the unit is stationed in a formation, and isFormationLeader says
+          whether it leads one. Both are true for a leader, so check the second.
+          A LEADER holds the route and takes movement orders - order it to move the whole
+          formation. A FOLLOWER (inFormation, not leader) takes station on its leader: a
+          MoveTo aimed at it individually is accepted and then quietly does nothing, and it
+          will keep reporting no waypoints of its own.
           A unit with actsIndependentlyInFormation does respond to individual orders.
         - maxFormationSpeedKnots is the ceiling its formation can make, set by its SLOWEST
           member. A speed order above that is silently clamped, not refused - ordering 28
