@@ -76,6 +76,27 @@ while (!shutdown.IsCancellationRequested)
 Console.WriteLine("Stopped.");
 return 0;
 
+/// <summary>
+/// Keeps the exact bytes the mod sent. Latency work needs to replay a real picture
+/// against the model repeatedly, and a live game session is a slow and lossy way to
+/// obtain one - a decision that times out leaves nothing behind to study.
+/// </summary>
+static void SavePicture(string payload)
+{
+    try
+    {
+        var dir = Path.Combine(AppContext.BaseDirectory, "pictures");
+        Directory.CreateDirectory(dir);
+        var path = Path.Combine(dir, $"picture-{DateTime.Now:yyyyMMdd-HHmmss}.json");
+        File.WriteAllText(path, payload);
+    }
+    catch (Exception ex)
+    {
+        // Never fail a decision over diagnostics.
+        Console.Error.WriteLine($"  ! could not save picture: {ex.Message}");
+    }
+}
+
 static async Task HandleAsync(HttpListenerContext ctx, OpenRouterClient client, CancellationToken ct)
 {
     var started = DateTime.UtcNow;
@@ -90,6 +111,8 @@ static async Task HandleAsync(HttpListenerContext ctx, OpenRouterClient client, 
         string payload;
         using (var reader = new StreamReader(ctx.Request.InputStream, Encoding.UTF8))
             payload = await reader.ReadToEndAsync(ct);
+
+        SavePicture(payload);
 
         var picture = JsonSerializer.Deserialize<TacticalPicture>(payload, PictureJson.Options);
         if (picture is null)
