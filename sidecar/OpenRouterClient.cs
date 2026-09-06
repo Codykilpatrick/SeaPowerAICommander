@@ -2,10 +2,10 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using SeaPowerForceAI.Orders;
-using SeaPowerForceAI.Picture;
+using SeaPowerAICommander.Orders;
+using SeaPowerAICommander.Picture;
 
-namespace SeaPowerForceAI.Sidecar;
+namespace SeaPowerAICommander.Sidecar;
 
 /// <summary>
 /// Talks to OpenRouter's OpenAI-compatible chat completions endpoint.
@@ -33,10 +33,10 @@ public sealed class OpenRouterClient : IDisposable
     /// earlier 2048-token ceiling changed nothing at all and went unnoticed while decisions
     /// still came back at 4,353 and 6,755 reasoning tokens.
     ///
-    /// Tune with FORCEAI_REASONING_EFFORT (high, medium, low); "none" removes the setting.
+    /// Tune with AICOMMANDER_REASONING_EFFORT (high, medium, low); "none" removes the setting.
     /// </summary>
     private readonly string _reasoningEffort =
-        Environment.GetEnvironmentVariable("FORCEAI_REASONING_EFFORT") ?? "low";
+        Environment.GetEnvironmentVariable("AICOMMANDER_REASONING_EFFORT") ?? "low";
 
     public OpenRouterClient(string apiKey, string model, TimeSpan timeout)
     {
@@ -45,8 +45,8 @@ public sealed class OpenRouterClient : IDisposable
         _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
 
         // Optional attribution headers OpenRouter uses to identify the calling app.
-        _http.DefaultRequestHeaders.Add("HTTP-Referer", "https://github.com/Codykilpatrick/SeaPowerForceAI");
-        _http.DefaultRequestHeaders.Add("X-Title", "Sea Power Force AI");
+        _http.DefaultRequestHeaders.Add("HTTP-Referer", "https://github.com/Codykilpatrick/SeaPowerAICommander");
+        _http.DefaultRequestHeaders.Add("X-Title", "Sea Power AI Commander");
     }
 
     /// <summary>

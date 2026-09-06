@@ -1,7 +1,7 @@
-using SeaPowerForceAI.Orders;
-using SeaPowerForceAI.Picture;
+using SeaPowerAICommander.Orders;
+using SeaPowerAICommander.Picture;
 
-namespace SeaPowerForceAI
+namespace SeaPowerAICommander
 {
     /// <summary>
     /// A force-level decision maker for one task force.

@@ -4,10 +4,10 @@ using System.Text;
 using System.Threading;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
-using SeaPowerForceAI.Orders;
-using SeaPowerForceAI.Picture;
+using SeaPowerAICommander.Orders;
+using SeaPowerAICommander.Picture;
 
-namespace SeaPowerForceAI
+namespace SeaPowerAICommander
 {
     /// <summary>
     /// Brain backed by the out-of-process sidecar.
@@ -126,7 +126,7 @@ namespace SeaPowerForceAI
             var thread = new Thread(() => Work(picture))
             {
                 IsBackground = true,
-                Name = "ForceAI-Brain",
+                Name = "AICommander-Brain",
             };
             thread.Start();
         }

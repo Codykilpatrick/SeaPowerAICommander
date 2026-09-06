@@ -1,7 +1,7 @@
 using System.Text.Json.Nodes;
-using SeaPowerForceAI.Orders;
+using SeaPowerAICommander.Orders;
 
-namespace SeaPowerForceAI.Sidecar;
+namespace SeaPowerAICommander.Sidecar;
 
 /// <summary>
 /// Builds the JSON schema the model must answer in.

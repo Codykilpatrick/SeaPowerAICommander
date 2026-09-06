@@ -4,7 +4,7 @@ using System.Linq;
 using SeaPower;
 using UnityEngine;
 
-namespace SeaPowerForceAI.Picture
+namespace SeaPowerAICommander.Picture
 {
     /// <summary>
     /// Turns a live <see cref="Taskforce"/> into a serializable <see cref="TacticalPicture"/>.

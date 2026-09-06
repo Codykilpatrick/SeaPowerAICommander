@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using SeaPower;
 
-namespace SeaPowerForceAI.Orders
+namespace SeaPowerAICommander.Orders
 {
     /// <summary>
     /// Applies a <see cref="ForceOrderSet"/> to the game.

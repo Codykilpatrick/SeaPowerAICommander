@@ -20,7 +20,7 @@
       _info.ini, exactly like a Workshop item, and shows up in the in-game mod menu.
     -->
     <StreamingAssetsDir>$(SeaPowerDir)\Sea Power_Data\StreamingAssets</StreamingAssetsDir>
-    <ModDeployDir>$(StreamingAssetsDir)\SeaPowerForceAI</ModDeployDir>
+    <ModDeployDir>$(StreamingAssetsDir)\SeaPowerAICommander</ModDeployDir>
 
     <!-- Anchor Chain (workshop id 3380210757) publishes AnchorChain.dll, which defines
          ACPlugin / IAnchorChainMod. Referenced at build time; loaded by its preloader at runtime. -->

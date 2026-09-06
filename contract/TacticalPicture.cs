@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace SeaPowerForceAI.Picture
+namespace SeaPowerAICommander.Picture
 {
     /// <summary>
     /// One task force's view of the battle at a moment in time.

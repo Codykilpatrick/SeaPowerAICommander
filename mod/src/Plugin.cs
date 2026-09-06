@@ -6,7 +6,7 @@ using BepInEx.Logging;
 using HarmonyLib;
 using UnityEngine;
 
-namespace SeaPowerForceAI
+namespace SeaPowerAICommander
 {
     /// <summary>
     /// Plugin root. Booted once by <see cref="AnchorChainEntry"/>.
@@ -16,8 +16,8 @@ namespace SeaPowerForceAI
     /// </summary>
     public class Plugin : MonoBehaviour
     {
-        public const string Guid = "com.codykilpatrick.forceai";
-        public const string Name = "Sea Power Force AI";
+        public const string Guid = "com.codykilpatrick.aicommander";
+        public const string Name = "Sea Power AI Commander";
         public const string Version = "0.1.0";
 
         internal static ManualLogSource Log;
@@ -81,7 +81,7 @@ namespace SeaPowerForceAI
                 _config = new ConfigFile(Path.Combine(Paths.ConfigPath, Guid + ".cfg"), true);
                 BindConfig();
 
-                var go = new GameObject("SeaPowerForceAI");
+                var go = new GameObject("SeaPowerAICommander");
                 UnityEngine.Object.DontDestroyOnLoad(go);
                 go.hideFlags = HideFlags.HideAndDontSave;
                 Instance = go.AddComponent<Plugin>();
@@ -99,7 +99,7 @@ namespace SeaPowerForceAI
         private static void BindConfig()
         {
             _cfgEnabled = _config.Bind("General", "Enabled", true,
-                "Master switch. When false the force-AI tick does nothing, but the patch stays applied.");
+                "Master switch. When false the commander tick does nothing, but the patch stays applied.");
 
             _cfgTickInterval = _config.Bind("General", "TickIntervalSeconds", 60f,
                 new ConfigDescription(
@@ -130,7 +130,7 @@ namespace SeaPowerForceAI
             _cfgBrain = _config.Bind("Brain", "Type", BrainType.Observing,
                 "Observing: log the picture, issue no orders. Sidecar: send the picture to the " +
                 "out-of-process brain and execute what it returns. Sidecar costs real money per " +
-                "decision and requires SeaPowerForceAI.Sidecar to be running.");
+                "decision and requires SeaPowerAICommander.Sidecar to be running.");
 
             _cfgSidecarEndpoint = _config.Bind("Brain", "SidecarEndpoint", "http://127.0.0.1:8787/",
                 "Where the sidecar listens. Loopback only - do not point this off-machine.");

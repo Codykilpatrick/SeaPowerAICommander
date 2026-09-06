@@ -1,9 +1,9 @@
 using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json.Nodes;
-using SeaPowerForceAI.Picture;
+using SeaPowerAICommander.Picture;
 
-namespace SeaPowerForceAI.Sidecar;
+namespace SeaPowerAICommander.Sidecar;
 
 /// <summary>
 /// Works out what the AI force is actually trying to achieve.

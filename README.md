@@ -1,4 +1,4 @@
-# Sea Power Force AI
+# Sea Power AI Commander
 
 A force-level brain for Sea Power, built on the empty hook the developers left behind.
 
@@ -93,9 +93,9 @@ dotnet run --project sidecar
 | Env var | Default | Meaning |
 |---|---|---|
 | `OPENROUTER_API_KEY` | *(required)* | Your key. Never read by the mod or committed. |
-| `FORCEAI_MODEL` | `anthropic/claude-opus-4.5` | Any OpenRouter model id that supports structured outputs. |
-| `FORCEAI_PREFIX` | `http://127.0.0.1:8787/` | Listener address. Loopback only by design. |
-| `FORCEAI_TIMEOUT_SECONDS` | `150` | Per-decision ceiling. Match it to the mod's `SidecarTimeoutMs`. |
+| `AICOMMANDER_MODEL` | `anthropic/claude-opus-4.5` | Any OpenRouter model id that supports structured outputs. |
+| `AICOMMANDER_PREFIX` | `http://127.0.0.1:8787/` | Listener address. Loopback only by design. |
+| `AICOMMANDER_TIMEOUT_SECONDS` | `150` | Per-decision ceiling. Match it to the mod's `SidecarTimeoutMs`. |
 
 Why out-of-process, and not the Anthropic SDK in the plugin: Unity's Mono runtime is
 hostile to modern BCL dependency trees, the API key stays out of a distributed mod, and
@@ -120,7 +120,7 @@ no orders. That verifies the tick fires and the picture reads correctly before a
 touches a unit. Set `DumpPictureJson = true` in the config to see the full serialized
 picture a brain would receive.
 
-Config lives at `BepInEx/config/com.codykilpatrick.forceai.cfg`.
+Config lives at `BepInEx/config/com.codykilpatrick.aicommander.cfg`.
 
 ## Extending
 

@@ -22,22 +22,23 @@ setx OPENROUTER_API_KEY "sk-or-..."     # from https://openrouter.ai/keys, then 
 dotnet run --project sidecar
 ```
 
-Then set `Brain.Type = Sidecar` in `BepInEx/config/com.codykilpatrick.forceai.cfg` and
+Then set `Brain.Type = Sidecar` in `BepInEx/config/com.codykilpatrick.aicommander.cfg` and
 start the game. Order does not matter — the plugin treats a missing sidecar as a
 non-fatal warning.
 
 | Env var | Default | Meaning |
 |---|---|---|
 | `OPENROUTER_API_KEY` | *(required)* | Your key. Never committed, never read by the mod. |
-| `FORCEAI_MODEL` | `anthropic/claude-opus-4.5` | Any OpenRouter model id supporting structured outputs. |
-| `FORCEAI_PREFIX` | `http://127.0.0.1:8787/` | Listener address. Loopback by design. |
-| `FORCEAI_TIMEOUT_SECONDS` | `150` | Per-decision ceiling on the OpenRouter call. |
+| `AICOMMANDER_MODEL` | `anthropic/claude-opus-4.5` | Any OpenRouter model id supporting structured outputs. |
+| `AICOMMANDER_PREFIX` | `http://127.0.0.1:8787/` | Listener address. Loopback by design. |
+| `AICOMMANDER_TIMEOUT_SECONDS` | `150` | Per-decision ceiling on the OpenRouter call. |
+| `AICOMMANDER_REASONING_EFFORT` | `low` | `high` / `medium` / `low`; `none` removes the setting entirely. |
 
 The listener binds `127.0.0.1` deliberately: this endpoint spends an API key's worth of
 money per request and must not be reachable off the machine.
 
 There are **two** timeouts on this path — the mod waiting on the sidecar
-(`SidecarTimeoutMs`, 150s) and the sidecar waiting on OpenRouter (`FORCEAI_TIMEOUT_SECONDS`,
+(`SidecarTimeoutMs`, 150s) and the sidecar waiting on OpenRouter (`AICOMMANDER_TIMEOUT_SECONDS`,
 150s). Raising only one leaves decisions still being abandoned at the other. Change both.
 
 ## Files

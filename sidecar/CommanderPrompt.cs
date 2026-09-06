@@ -1,8 +1,8 @@
 using System.Text;
 using System.Text.Json;
-using SeaPowerForceAI.Picture;
+using SeaPowerAICommander.Picture;
 
-namespace SeaPowerForceAI.Sidecar;
+namespace SeaPowerAICommander.Sidecar;
 
 /// <summary>
 /// The system prompt and the per-tick user message.

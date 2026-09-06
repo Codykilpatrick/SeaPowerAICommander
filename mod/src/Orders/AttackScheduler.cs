@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using SeaPower;
 
-namespace SeaPowerForceAI.Orders
+namespace SeaPowerAICommander.Orders
 {
     /// <summary>
     /// Time-on-target coordination.

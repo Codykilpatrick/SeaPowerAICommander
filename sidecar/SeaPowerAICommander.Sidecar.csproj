@@ -10,8 +10,8 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
-    <AssemblyName>SeaPowerForceAI.Sidecar</AssemblyName>
-    <RootNamespace>SeaPowerForceAI.Sidecar</RootNamespace>
+    <AssemblyName>SeaPowerAICommander.Sidecar</AssemblyName>
+    <RootNamespace>SeaPowerAICommander.Sidecar</RootNamespace>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
@@ -19,7 +19,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\contract\SeaPowerForceAI.Contract.csproj" />
+    <ProjectReference Include="..\contract\SeaPowerAICommander.Contract.csproj" />
   </ItemGroup>
 
 </Project>

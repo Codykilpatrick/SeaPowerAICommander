@@ -72,7 +72,7 @@ clocks, because the two kinds of order spoil at different rates. See
 
 ## Config
 
-`BepInEx/config/com.codykilpatrick.forceai.cfg`, generated on first run.
+`BepInEx/config/com.codykilpatrick.aicommander.cfg`, generated on first run.
 
 | Section | Key | Default | Meaning |
 |---|---|---|---|

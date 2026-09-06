@@ -1,9 +1,9 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
-using SeaPowerForceAI.Orders;
-using SeaPowerForceAI.Picture;
-using SeaPowerForceAI.Sidecar;
+using SeaPowerAICommander.Orders;
+using SeaPowerAICommander.Picture;
+using SeaPowerAICommander.Sidecar;
 
 // Loopback-only HTTP listener. The mod POSTs a tactical picture; we answer with orders.
 //
@@ -24,13 +24,13 @@ if (string.IsNullOrWhiteSpace(apiKey))
     return 1;
 }
 
-var model = Environment.GetEnvironmentVariable("FORCEAI_MODEL") ?? DefaultModel;
-var prefix = Environment.GetEnvironmentVariable("FORCEAI_PREFIX") ?? DefaultPrefix;
+var model = Environment.GetEnvironmentVariable("AICOMMANDER_MODEL") ?? DefaultModel;
+var prefix = Environment.GetEnvironmentVariable("AICOMMANDER_PREFIX") ?? DefaultPrefix;
 // Matches the mod's SidecarTimeoutMs default. There are two timeouts on this path -
 // the mod waiting on the sidecar, and the sidecar waiting on OpenRouter - and raising
 // only the first left decisions still being abandoned at 90 seconds.
 var timeout = TimeSpan.FromSeconds(
-    int.TryParse(Environment.GetEnvironmentVariable("FORCEAI_TIMEOUT_SECONDS"), out var t) ? t : 150);
+    int.TryParse(Environment.GetEnvironmentVariable("AICOMMANDER_TIMEOUT_SECONDS"), out var t) ? t : 150);
 
 using var client = new OpenRouterClient(apiKey, model, timeout);
 
@@ -59,8 +59,8 @@ Console.SetOut(new TeeWriter(Console.Out, logFile));
 Console.SetError(new TeeWriter(Console.Error, logFile));
 Console.WriteLine($"Logging to {logPath}");
 
-Console.WriteLine($"Force AI sidecar listening on {prefix}");
-Console.WriteLine($"Model: {model}   (override with FORCEAI_MODEL)");
+Console.WriteLine($"AI Commander sidecar listening on {prefix}");
+Console.WriteLine($"Model: {model}   (override with AICOMMANDER_MODEL)");
 Console.WriteLine("Waiting for the game. Ctrl+C to stop.");
 Console.WriteLine();
 

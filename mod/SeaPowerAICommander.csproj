@@ -2,8 +2,8 @@
 
   <PropertyGroup>
     <TargetFramework>net472</TargetFramework>
-    <AssemblyName>SeaPowerForceAI</AssemblyName>
-    <RootNamespace>SeaPowerForceAI</RootNamespace>
+    <AssemblyName>SeaPowerAICommander</AssemblyName>
+    <RootNamespace>SeaPowerAICommander</RootNamespace>
     <LangVersion>latest</LangVersion>
     <Version>0.1.0</Version>
 
@@ -21,7 +21,7 @@
 
     <!-- Shared with the sidecar. Unlike the game references below, this one IS copied
          next to the plugin - the game process has no other source for it. -->
-    <ProjectReference Include="..\contract\SeaPowerForceAI.Contract.csproj" />
+    <ProjectReference Include="..\contract\SeaPowerAICommander.Contract.csproj" />
   </ItemGroup>
 
   <!--
@@ -102,7 +102,7 @@
       <!-- The plugin, the contract assembly it depends on, and the manifest that makes
            the folder show up as a mod in the in-game menu. -->
       <DeployFiles Include="$(TargetPath)" />
-      <DeployFiles Include="$(TargetDir)SeaPowerForceAI.Contract.dll" />
+      <DeployFiles Include="$(TargetDir)SeaPowerAICommander.Contract.dll" />
       <DeployFiles Include="$(MSBuildProjectDirectory)\..\_info.ini" />
     </ItemGroup>
     <MakeDir Directories="$(ModDeployDir)" />

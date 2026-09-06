@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace SeaPowerForceAI.Orders
+namespace SeaPowerAICommander.Orders
 {
     /// <summary>
     /// The action space of the force brain.

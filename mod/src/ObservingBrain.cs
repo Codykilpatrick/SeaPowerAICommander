@@ -1,8 +1,8 @@
 using Newtonsoft.Json;
-using SeaPowerForceAI.Orders;
-using SeaPowerForceAI.Picture;
+using SeaPowerAICommander.Orders;
+using SeaPowerAICommander.Picture;
 
-namespace SeaPowerForceAI
+namespace SeaPowerAICommander
 {
     /// <summary>
     /// The default brain: watches and reports, commands nothing.

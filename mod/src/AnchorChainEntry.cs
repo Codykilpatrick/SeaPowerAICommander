@@ -1,6 +1,6 @@
 using AnchorChain;
 
-namespace SeaPowerForceAI
+namespace SeaPowerAICommander
 {
     /// <summary>
     /// Anchor Chain entry point. The chainloader finds this attribute, instantiates the

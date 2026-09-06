@@ -4,10 +4,10 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using HarmonyLib;
 using SeaPower;
-using SeaPowerForceAI.Orders;
-using SeaPowerForceAI.Picture;
+using SeaPowerAICommander.Orders;
+using SeaPowerAICommander.Picture;
 
-namespace SeaPowerForceAI
+namespace SeaPowerAICommander
 {
     /// <summary>
     /// Occupies TaskForceAI.OnUpdate.
@@ -128,7 +128,7 @@ namespace SeaPowerForceAI
                     _fieldMissingLogged = true;
                     Plugin.Log.LogError(
                         "TaskForceAI._taskforce could not be resolved - the game version likely " +
-                        "changed. Force AI is inactive; re-check the field name against this build.");
+                        "changed. AI Commander is inactive; re-check the field name against this build.");
                 }
                 return;
             }
