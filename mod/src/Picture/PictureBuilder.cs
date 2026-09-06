@@ -500,7 +500,26 @@ namespace SeaPowerForceAI.Picture
                 if (veh == null) { skipNullVehicle++; continue; }
 
                 var obj = veh.Object;
-                if (obj == null || obj.IsDestroyed) { skipNoObject++; continue; }
+
+                // A destroyed hostile is a result, not a gap. Skipping it silently made a
+                // successful strike look identical to a lost track.
+                if (obj != null && obj.IsDestroyed)
+                {
+                    skipNoObject++;
+                    if (obj._taskforce != null && obj._taskforce != tf
+                        && tf.RelationshipTo(obj._taskforce) == RelationsState.Hostile)
+                    {
+                        picture.RecentKills.Add(new LostUnit
+                        {
+                            Id = obj.UniqueID,
+                            Name = obj.getName(),
+                            Category = obj is Vessel ? "Vessel" : (obj is LandUnit ? "LandUnit" : "Air"),
+                        });
+                    }
+                    continue;
+                }
+
+                if (obj == null) { skipNoObject++; continue; }
 
                 // Our own units come through OwnUnits; the plotting table also holds them.
                 if (obj._taskforce == tf) { skipOwn++; continue; }

@@ -109,6 +109,19 @@ namespace SeaPowerForceAI.Picture
         public int TotalLosses;
 
         /// <summary>
+        /// Hostile units destroyed since the last decision, as far as we can observe.
+        ///
+        /// The other half of the ledger. A commander given only its own casualties can
+        /// see what its plan costs but never what it achieves - and a destroyed contact
+        /// simply stops appearing, which is indistinguishable from losing the track.
+        /// Without this it cannot tell a successful strike from a failed one.
+        /// </summary>
+        public List<LostUnit> RecentKills = new List<LostUnit>();
+
+        /// <summary>Running total of hostile units observed destroyed.</summary>
+        public int TotalKills;
+
+        /// <summary>
         /// Game-seconds since the previous decision, so the brain can judge how stale
         /// its standing orders are. -1 on the first decision of a mission.
         /// </summary>

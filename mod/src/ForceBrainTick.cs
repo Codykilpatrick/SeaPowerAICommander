@@ -79,6 +79,15 @@ namespace SeaPowerForceAI
                 new Dictionary<string, ForceOrder>();
 
             public int TotalLosses;
+
+            /// <summary>
+            /// Kills already counted. A wreck lingers in the plotting table for several
+            /// cycles, so without this the same sinking would be reported over and over
+            /// and the commander would think it was winning far harder than it is.
+            /// </summary>
+            public readonly HashSet<int> CountedKills = new HashSet<int>();
+
+            public int TotalKills;
             public float LastDecisionTime = -1f;
             public bool Seeded;
         }
@@ -261,6 +270,22 @@ namespace SeaPowerForceAI
             }
 
             picture.TotalLosses = state.TotalLosses;
+
+            // Report each kill once, the cycle it is first observed.
+            for (int i = picture.RecentKills.Count - 1; i >= 0; i--)
+            {
+                if (!state.CountedKills.Add(picture.RecentKills[i].Id))
+                    picture.RecentKills.RemoveAt(i);
+            }
+
+            state.TotalKills += picture.RecentKills.Count;
+            picture.TotalKills = state.TotalKills;
+
+            if (picture.RecentKills.Count > 0)
+            {
+                foreach (var k in picture.RecentKills)
+                    Plugin.Log.LogInfo($"[kill] {picture.TaskforceName}: {k.Name} ({k.Id}) destroyed");
+            }
 
             // Drop standing orders for units that no longer exist, then replay the rest.
             var live = new HashSet<int>();

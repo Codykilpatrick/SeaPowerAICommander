@@ -54,6 +54,11 @@ public static class CommanderPrompt
         - recentLosses are units you had at the last decision and no longer have. They
           were almost certainly sunk or shot down.
         - totalLosses is your cumulative attrition for the battle.
+        - recentKills and totalKills are hostile units you have destroyed. This is how you
+          know whether your plan is working. A strike that produced a kill is worth
+          repeating; one that produced none against a defended target probably is not.
+          Weigh kills against losses - that ratio, not survival, is how your mission is
+          going.
         - secondsSinceLastDecision tells you how stale your standing orders are.
 
         "Do not reissue an identical order" is NOT an instruction to sit still. Any of the
@@ -259,8 +264,13 @@ public static class CommanderPrompt
             var names = picture.RecentLosses.ConvertAll(l => $"{l.Name} ({l.Category})");
             sb.AppendLine($"LOST since last decision: {string.Join(", ", names)}.");
         }
-        if (picture.TotalLosses > 0)
-            sb.AppendLine($"Cumulative losses this battle: {picture.TotalLosses}.");
+        if (picture.RecentKills.Count > 0)
+        {
+            var kills = picture.RecentKills.ConvertAll(k => $"{k.Name} ({k.Category})");
+            sb.AppendLine($"DESTROYED since last decision: {string.Join(", ", kills)}.");
+        }
+        if (picture.TotalLosses > 0 || picture.TotalKills > 0)
+            sb.AppendLine($"Battle tally: {picture.TotalKills} hostile destroyed, {picture.TotalLosses} of yours lost.");
 
         sb.AppendLine();
         sb.AppendLine(json);
