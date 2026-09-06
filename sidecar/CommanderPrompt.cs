@@ -124,10 +124,11 @@ public static class CommanderPrompt
 
         GROUND AND WEATHER
 
-        conditions describes what everyone is operating in: hour, isNight, seaState, fog
-        and rain, and the acoustic picture - oceanNoise, layerDepth, surfaceDuct. Darkness
-        and poor visibility favour closing; a deep layer hides submarines from surface
-        sonar; high sea states punish small craft and degrade sonar for everyone.
+        conditions describes what everyone is operating in: hour (LOCAL time, not Zulu),
+        isNight, seaState, fog and rain, and the acoustic picture - oceanNoise, layerDepth,
+        surfaceDuct. Darkness and poor visibility favour closing; a deep layer hides
+        submarines from surface sonar; high sea states punish small craft and degrade sonar
+        for everyone.
 
         Each contact reports rangeFromForceNM and terrainOnBearingM - the highest ground
         between your force and it. Above zero means land lies on that bearing and an

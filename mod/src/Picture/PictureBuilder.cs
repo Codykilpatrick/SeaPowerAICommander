@@ -66,9 +66,14 @@ namespace SeaPowerForceAI.Picture
                 if (env == null) return;
 
                 var c = picture.Conditions;
-                c.Hour = env.Hour;
+
+                // TimeZoneAdjustedHour, not Hour. Hour is Zulu, and darkness is a LOCAL
+                // phenomenon - reading Zulu made the commander announce "at night" during
+                // a late afternoon and set its ROE accordingly. Confidently wrong data is
+                // worse than absent data.
+                c.Hour = env.TimeZoneAdjustedHour;
                 c.Minutes = env.Minutes;
-                c.IsNight = env.Hour < 6 || env.Hour >= 20;
+                c.IsNight = c.Hour < 6 || c.Hour >= 20;
                 c.SeaState = env.SeaState;
                 c.IsFog = env.IsFog;
                 c.IsRaining = env.IsRaining;

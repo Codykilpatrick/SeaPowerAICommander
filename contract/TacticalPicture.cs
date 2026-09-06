@@ -80,11 +80,15 @@ namespace SeaPowerForceAI.Picture
 
     public class EnvironmentConditions
     {
-        /// <summary>Local hour, 0-23.</summary>
+        /// <summary>
+        /// LOCAL hour, 0-23 - time-zone adjusted, not Zulu. Darkness is a local
+        /// phenomenon, and reading Zulu once had the commander declaring night during a
+        /// late afternoon.
+        /// </summary>
         public int Hour;
         public int Minutes;
 
-        /// <summary>Derived from the hour. Darkness favours a close approach.</summary>
+        /// <summary>Derived from the local hour. Darkness favours a close approach.</summary>
         public bool IsNight;
 
         /// <summary>Sea state. High states degrade small-boat operations and sonar alike.</summary>
