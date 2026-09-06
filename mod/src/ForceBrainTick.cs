@@ -141,6 +141,13 @@ namespace SeaPowerForceAI
             if (tf.Side == Taskforce.TfType.Player && !Plugin.DrivePlayerTaskforce) return;
             if (tf.Side == Taskforce.TfType.None) return;
 
+            // A side with nothing that can shoot is not a force to command. Baltim puts five
+            // civilian shrimp boats in the water as their own task force, and we were building
+            // them a full tactical picture every cycle, paying for a decision, and ordering the
+            // trawlers to weapons Hold - roughly doubling the spend on any mission with
+            // civilian traffic. Hormuz hid this because its Neutral side was empty.
+            if (!HasArmedUnit(tf)) return;
+
             var state = States.GetOrCreateValue(instance);
             if (state.Brain == null)
                 state.Brain = Plugin.CreateBrain();
@@ -307,12 +314,29 @@ namespace SeaPowerForceAI
             var live = new HashSet<int>();
             foreach (var u in picture.OwnUnits) live.Add(u.Id);
 
+            // An attack order against a contact that is gone is finished, whether the target
+            // sank or the track was simply lost. Left standing, the commander sees a live
+            // order against a ship it watched die and issues Disengage to clear it - which
+            // cannot be verified either, so it reissues the same cancellation every cycle
+            // forever. Retiring the order removes the thing being cancelled.
+            var held = new HashSet<int>();
+            foreach (var c in picture.Contacts) held.Add(c.Id);
+
             var stale = new List<string>();
             foreach (var pair in state.StandingOrders)
             {
                 if (!live.Contains(pair.Value.UnitId))
                 {
                     stale.Add(pair.Key);
+                    continue;
+                }
+
+                if (IsAgainstAContact(pair.Value.Kind) && !held.Contains(pair.Value.TargetContactId))
+                {
+                    stale.Add(pair.Key);
+                    Plugin.Log.LogInfo(
+                        $"[orders] retiring {pair.Value.Kind} by unit {pair.Value.UnitId}: " +
+                        $"contact {pair.Value.TargetContactId} is no longer held");
                     continue;
                 }
 
@@ -355,6 +379,65 @@ namespace SeaPowerForceAI
 
             state.LastDecisionTime = now;
             state.Seeded = true;
+        }
+
+        /// <summary>
+        /// Whether this order kind is aimed at a specific contact, and so becomes meaningless
+        /// once that contact is no longer held.
+        /// </summary>
+        private static bool IsAgainstAContact(ForceOrderKind kind)
+        {
+            switch (kind)
+            {
+                case ForceOrderKind.AttackTarget:
+                case ForceOrderKind.CoordinatedAttack:
+                case ForceOrderKind.LaunchAirstrike:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        /// <summary>
+        /// Whether this task force holds anything that can engage. Checked before a picture is
+        /// built, so a purely civilian side costs nothing at all rather than costing a model
+        /// call to be told it has nothing to fight with.
+        /// </summary>
+        private static bool HasArmedUnit(Taskforce tf)
+        {
+            try
+            {
+                if (Armed(tf._taskforceVessels)) return true;
+                if (Armed(tf._taskforceLandUnits)) return true;
+                if (Armed(tf._taskforceAircraft)) return true;
+                if (Armed(tf._taskforceSubmarines)) return true;
+                return false;
+            }
+            catch (Exception ex)
+            {
+                // Never silently stop driving a force over a null field somewhere.
+                Plugin.Log.LogWarning($"[brain] could not check {tf._nameInMissionFile} for weapons: {ex.Message}");
+                return true;
+            }
+        }
+
+        private static bool Armed(List<ObjectBase> units)
+        {
+            if (units == null) return false;
+
+            foreach (var obj in units)
+            {
+                if (obj == null || obj.IsDestroyed || obj._obp == null) continue;
+
+                // Chaff alone does not make a combatant; anything that can shoot does.
+                var p = obj._obp;
+                if (p._gunWeapons != null && p._gunWeapons.Count > 0) return true;
+                if (p._launcherWeapons != null && p._launcherWeapons.Count > 0) return true;
+                if (p._hardpointWeapons != null && p._hardpointWeapons.Count > 0) return true;
+                if (p._ciwsWeapons != null && p._ciwsWeapons.Count > 0) return true;
+            }
+
+            return false;
         }
 
         /// <summary>

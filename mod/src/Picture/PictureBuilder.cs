@@ -490,6 +490,18 @@ namespace SeaPowerForceAI.Picture
                 return;
             }
 
+            // A restarted mission with no game restart leaves no boundary in BepInEx's log,
+            // which spans runs - so "cut at the last boot line" silently reads the previous
+            // mission. That cost a wrong reading of a battle's results. A marker whenever the
+            // clock goes backwards makes the boundary explicit.
+            if (picture.TimeSeconds < _lastSeenMissionTime - 5f)
+            {
+                Plugin.Log.LogInfo(
+                    $"=== MISSION RESTART: {picture.MissionName} " +
+                    $"(clock went {_lastSeenMissionTime:F0}s -> {picture.TimeSeconds:F0}s) ===");
+            }
+            _lastSeenMissionTime = picture.TimeSeconds;
+
             picture.PlotEntries = vehicles.Count;
             ReadAirstrikes(picture, tf);
 
@@ -607,6 +619,9 @@ namespace SeaPowerForceAI.Picture
         /// believed was under way, declining to engage escorts it thought were being
         /// handled.
         /// </summary>
+        /// <summary>Mission clock at the last picture, to notice a restart.</summary>
+        private static float _lastSeenMissionTime;
+
         private static void ReadAirstrikes(TacticalPicture picture, Taskforce tf)
         {
             try

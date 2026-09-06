@@ -44,6 +44,13 @@ namespace SeaPowerForceAI
 
         private readonly string _endpoint;
         private readonly int _timeoutMs;
+        /// <summary>
+        /// The floor never scales below this, however fast the clock runs. A decision costs
+        /// real money and the API is shared - compression should widen the tempo, not remove
+        /// the brake.
+        /// </summary>
+        private const float AbsoluteMinRequestGapMs = 500f;
+
         private readonly int _minRequestGapMs;
 
         // Written by the worker thread, read by the Unity thread.
@@ -86,14 +93,26 @@ namespace SeaPowerForceAI
             _skippedSinceSubmit = 0;
 
             // Wall-clock backstop against time compression and many task forces at once.
+            //
+            // Scaled by compression, because the two throttles run on different clocks: the
+            // tick interval is 60 GAME seconds, this floor is real milliseconds. Above ~15x
+            // the game-time throttle keeps saying go while a fixed real-time floor says no,
+            // and the commander is starved exactly when the tempo is highest - at 20x it was
+            // rejecting nearly every tick mid-engagement. Scaling keeps the intent of both:
+            // roughly one decision per tick interval, however fast the clock runs, with an
+            // absolute floor so a runaway still cannot hammer the API.
             lock (RateGate)
             {
+                var compression = picture.TimeCompression > 1f ? picture.TimeCompression : 1f;
+                var floorMs = Math.Max(AbsoluteMinRequestGapMs, _minRequestGapMs / compression);
+
                 var since = (DateTime.UtcNow - _lastRequestUtc).TotalMilliseconds;
-                if (since < _minRequestGapMs)
+                if (since < floorMs)
                 {
                     Plugin.Log.LogInfo(
                         $"[brain] rate gate: skipping {picture.TaskforceName}, " +
-                        $"{since:F0}ms since last request (floor {_minRequestGapMs}ms)");
+                        $"{since:F0}ms since last request (floor {floorMs:F0}ms " +
+                        $"= {_minRequestGapMs}ms / {compression:F0}x)");
                     return;
                 }
                 _lastRequestUtc = DateTime.UtcNow;
