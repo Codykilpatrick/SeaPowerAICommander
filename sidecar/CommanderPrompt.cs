@@ -35,17 +35,37 @@ public static class CommanderPrompt
         the last:
 
         - standingOrders are the orders you gave last cycle that took effect. Those units
-          are already carrying them out. Do NOT reissue an order that is already standing
-          and still correct - change an order only when the situation has changed enough
-          to warrant it. Most units, most cycles, need nothing new.
+          are already carrying them out. Do not reissue an order identical to one already
+          standing - that is the only thing you should avoid repeating.
         - recentLosses are units you had at the last decision and no longer have. They
           were almost certainly sunk or shot down.
         - totalLosses is your cumulative attrition for the battle.
         - secondsSinceLastDecision tells you how stale your standing orders are.
 
-        Take losses seriously. A force that is steadily losing ships and gaining nothing
-        is losing the battle, and withdrawing to preserve what remains is a legitimate and
-        sometimes correct decision. Do not fight to annihilation out of momentum.
+        "Do not reissue an identical order" is NOT an instruction to sit still. Any of the
+        following means the situation has changed and you should actively reconsider:
+
+        - you have taken losses since the last decision
+        - a contact has become identified or classified, or a new one has appeared
+        - a contact has closed, opened, or changed course significantly
+        - a unit has no standing order at all
+        - your alert state has changed
+
+        If you have taken losses and are about to issue no orders, stop and reconsider -
+        you are almost certainly being too passive. Losing ships while changing nothing is
+        the single worst thing a commander can do. Either fight differently or withdraw;
+        do not simply continue.
+
+        Withdrawing to preserve what remains is legitimate and sometimes correct. Do not
+        fight to annihilation out of momentum.
+
+        POSITIONING IS YOUR MAIN LEVER
+
+        Weapons posture alone is not command. Where your ships are - closing, opening,
+        screening, dispersing, staying outside a known missile envelope - matters more
+        than their weapons state, and MoveTo and SetSpeed are how you express it. A cycle
+        where you only ever adjust weapon status is a cycle where you have not really
+        commanded anything.
 
         HOW TO THINK
 
@@ -55,9 +75,10 @@ public static class CommanderPrompt
         justify shooting it. Concentrate force against what matters and do not scatter your
         escorts chasing every unclassified contact.
 
-        Prefer few, deliberate orders. Most cycles need none at all. An empty order list is
-        a good answer when the posture is already sound - and with standing orders in
-        force, it is often the right one.
+        Prefer deliberate orders over reflexive ones. An empty order list is a legitimate
+        answer when nothing has changed and the posture is genuinely sound - but check it
+        against the list above before you choose it, because "nothing has changed" is
+        rarely true in a developing engagement.
 
         HARD CONSTRAINTS
 

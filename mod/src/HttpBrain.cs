@@ -50,6 +50,9 @@ namespace SeaPowerForceAI
         private volatile ForceOrderSet _ready;
         private volatile bool _inFlight;
 
+        /// <summary>Ticks skipped while the current decision is outstanding, for logging.</summary>
+        private int _skippedSinceSubmit;
+
         public HttpBrain(string endpoint, int timeoutMs, int minRequestGapMs)
         {
             _endpoint = endpoint;
@@ -63,9 +66,24 @@ namespace SeaPowerForceAI
             // acting on where the enemy was two minutes ago is its own kind of wrong.
             if (_inFlight)
             {
-                Plugin.Log.LogDebug($"[brain] skipping submit for {picture.TaskforceName}, request still in flight");
+                // Info, not Debug. BepInEx's disk logger is configured for
+                // "Fatal, Error, Warning, Message, Info", so LogDebug never reaches the
+                // file - and at high time compression this is THE reason most ticks
+                // produce no decision. Hiding it makes the mod look inert.
+                //
+                // Throttled so it reports the backlog once per skipped decision rather
+                // than once per tick.
+                _skippedSinceSubmit++;
+                if (_skippedSinceSubmit == 1 || _skippedSinceSubmit % 10 == 0)
+                {
+                    Plugin.Log.LogInfo(
+                        $"[brain] {picture.TaskforceName}: tick skipped, decision still in flight " +
+                        $"({_skippedSinceSubmit} skipped since it started)");
+                }
                 return;
             }
+
+            _skippedSinceSubmit = 0;
 
             // Wall-clock backstop against time compression and many task forces at once.
             lock (RateGate)
@@ -114,6 +132,7 @@ namespace SeaPowerForceAI
 
         private void Work(string body, string taskforceName)
         {
+            var startedUtc = DateTime.UtcNow;
             try
             {
                 var request = (HttpWebRequest)WebRequest.Create(_endpoint);
@@ -138,6 +157,13 @@ namespace SeaPowerForceAI
                     Plugin.Log.LogWarning($"[brain] empty response for {taskforceName}");
                     return;
                 }
+
+                // Real-time latency is what makes decisions go stale under time
+                // compression, so record it rather than inferring it.
+                var seconds = (DateTime.UtcNow - startedUtc).TotalSeconds;
+                Plugin.Log.LogInfo(
+                    $"[brain] {taskforceName}: decision returned in {seconds:F1}s real " +
+                    $"({set.Orders.Count} order(s))");
 
                 _ready = set;
             }

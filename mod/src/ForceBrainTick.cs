@@ -183,7 +183,16 @@ namespace SeaPowerForceAI
                     $"from a picture {age:F0}s old; {ready.Orders.Count} durable order(s) kept.");
             }
 
-            if (ready.Orders.Count == 0) return;
+            if (ready.Orders.Count == 0)
+            {
+                // Log it. "No change needed" is a real and often correct decision, but
+                // silence here is indistinguishable from the brain never having run -
+                // which made a live battle impossible to diagnose.
+                Plugin.Log.LogInfo(
+                    $"[orders] {tf._nameInMissionFile}: no change ordered " +
+                    $"(picture {age:F0}s old, {state.StandingOrders.Count} standing)");
+                return;
+            }
 
             var accepted = OrderExecutor.Apply(tf, ready);
 
