@@ -69,8 +69,7 @@ public sealed class OpenRouterClient : IDisposable
         if (!response.IsSuccessStatusCode)
             throw new InvalidOperationException($"OpenRouter returned {(int)response.StatusCode}: {Truncate(raw, 400)}");
 
-        var root = JsonNode.Parse(raw) as JsonObject
-                   ?? throw new InvalidOperationException("Response was not a JSON object.");
+        var root = ParseBody(raw, "Objective response");
 
         return root["choices"]?[0]?["message"]?["content"]?.GetValue<string>() ?? string.Empty;
     }
@@ -136,10 +135,28 @@ public sealed class OpenRouterClient : IDisposable
             $"({reasoning} reasoning + {visible} orders)");
     }
 
+    /// <summary>
+    /// Parses a response body that is supposed to be JSON, and says what arrived when it is
+    /// not. OpenRouter can answer 200 with a gateway error page, and the raw parser failure
+    /// for that reads "'G' is an invalid start of a value" - which identifies neither the
+    /// sender nor the problem.
+    /// </summary>
+    private static JsonObject ParseBody(string raw, string what)
+    {
+        try
+        {
+            return JsonNode.Parse(raw) as JsonObject
+                   ?? throw new InvalidOperationException($"{what} was not a JSON object: {Truncate(raw, 400)}");
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException($"{what} was not JSON ({ex.Message}): {Truncate(raw, 400)}");
+        }
+    }
+
     private static ForceOrderSet Parse(string raw, TacticalPicture picture)
     {
-        var root = JsonNode.Parse(raw) as JsonObject
-                   ?? throw new InvalidOperationException("Response was not a JSON object.");
+        var root = ParseBody(raw, "Decision response");
 
         // OpenRouter surfaces upstream provider failures as a 200 with an error body.
         if (root["error"] is JsonNode err)
