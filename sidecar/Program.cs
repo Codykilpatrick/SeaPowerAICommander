@@ -48,6 +48,17 @@ catch (HttpListenerException ex)
     return 1;
 }
 
+// Everything the console shows is also written to a file. The assessments are the only
+// place the commander's reasoning is visible, and reading them back should not depend on
+// someone having the terminal open at the time.
+var logDir = Path.Combine(AppContext.BaseDirectory, "logs");
+Directory.CreateDirectory(logDir);
+var logPath = Path.Combine(logDir, $"sidecar-{DateTime.Now:yyyyMMdd-HHmmss}.log");
+var logFile = new StreamWriter(logPath, append: true) { AutoFlush = true };
+Console.SetOut(new TeeWriter(Console.Out, logFile));
+Console.SetError(new TeeWriter(Console.Error, logFile));
+Console.WriteLine($"Logging to {logPath}");
+
 Console.WriteLine($"Force AI sidecar listening on {prefix}");
 Console.WriteLine($"Model: {model}   (override with FORCEAI_MODEL)");
 Console.WriteLine("Waiting for the game. Ctrl+C to stop.");
@@ -151,4 +162,20 @@ static async Task WriteAsync(HttpListenerContext ctx, int status, string body)
     ctx.Response.ContentLength64 = bytes.Length;
     await ctx.Response.OutputStream.WriteAsync(bytes);
     ctx.Response.Close();
+}
+
+/// <summary>Writes to the console and to a file at once, so a session leaves a record.</summary>
+sealed class TeeWriter : TextWriter
+{
+    private readonly TextWriter _a;
+    private readonly TextWriter _b;
+
+    public TeeWriter(TextWriter a, TextWriter b) { _a = a; _b = b; }
+
+    public override Encoding Encoding => _a.Encoding;
+
+    public override void Write(char value) { _a.Write(value); _b.Write(value); }
+    public override void Write(string? value) { _a.Write(value); _b.Write(value); }
+    public override void WriteLine(string? value) { _a.WriteLine(value); _b.WriteLine(value); }
+    public override void Flush() { _a.Flush(); _b.Flush(); }
 }

@@ -491,6 +491,7 @@ namespace SeaPowerForceAI.Picture
             }
 
             picture.PlotEntries = vehicles.Count;
+            ReadAirstrikes(picture, tf);
 
             var centre = ForceCentre(picture);
             int skipNullVehicle = 0, skipNoObject = 0, skipOwn = 0;
@@ -593,6 +594,47 @@ namespace SeaPowerForceAI.Picture
             else score += 50.0;
 
             return score;
+        }
+
+        /// <summary>
+        /// What the task force's air strikes are actually doing.
+        ///
+        /// Ordering a strike only creates one and starts a state machine; the aircraft are
+        /// found later, asynchronously, and if none can be assigned it sits in
+        /// AssigningAircraft indefinitely. Nothing about that is visible from the order,
+        /// which always appears to succeed - so the commander repeatedly ordered strikes
+        /// that never flew, then shaped its whole posture around the air campaign it
+        /// believed was under way, declining to engage escorts it thought were being
+        /// handled.
+        /// </summary>
+        private static void ReadAirstrikes(TacticalPicture picture, Taskforce tf)
+        {
+            try
+            {
+                if (tf?._airStrikes == null) return;
+
+                foreach (var strike in tf._airStrikes)
+                {
+                    if (strike == null || strike._isFinished) continue;
+
+                    var target = strike._initialTargets != null && strike._initialTargets.Count > 0
+                        ? strike._initialTargets[0]
+                        : null;
+
+                    picture.Airstrikes.Add(new AirstrikeStatus
+                    {
+                        TargetContactId = target != null ? target.UniqueID : 0,
+                        StrikeType = strike._type.ToString(),
+                        State = strike.StateMachine != null ? strike.StateMachine.CurrentStateName : "Unknown",
+                        AircraftAssigned = strike._attackAircraft != null ? strike._attackAircraft.Count : 0,
+                        AgeSeconds = 0f,
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.LogWarning($"[picture] could not read air strikes: {ex.Message}");
+            }
         }
 
         private static void ApplyPosition(Contact contact, Vehicle veh)

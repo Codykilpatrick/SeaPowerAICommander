@@ -404,6 +404,25 @@ namespace SeaPowerForceAI
         /// type would look identical to one that worked, and the commander would keep
         /// issuing it forever. This is the only thing that closes the loop.
         /// </summary>
+        /// <summary>
+        /// Records an order that is not being carried out - to the log for us, and into the
+        /// picture for the commander. It had no way to learn that an order failed, so it kept
+        /// planning around orders that were doing nothing: speeds the tactical AI had
+        /// rewritten, movement given to formation followers that cannot steer.
+        /// </summary>
+        private static void Problem(TacticalPicture picture, string message)
+        {
+            Plugin.Log.LogWarning(message);
+            if (picture.OrderProblems.Count < 20) picture.OrderProblems.Add(Strip(message));
+        }
+
+        /// <summary>The log tag is ours; the commander only needs the sentence.</summary>
+        private static string Strip(string message)
+        {
+            const string tag = "[verify] ";
+            return message.StartsWith(tag) ? message.Substring(tag.Length) : message;
+        }
+
         private static void VerifyStandingOrders(TacticalPicture picture)
         {
             if (picture.StandingOrders.Count == 0) return;
@@ -428,14 +447,14 @@ namespace SeaPowerForceAI
                         if (unit.InFormation && !unit.IsFormationLeader && !unit.ActsIndependentlyInFormation)
                         {
                             ignored++;
-                            Plugin.Log.LogWarning(
+                            Problem(picture,
                                 $"[verify] {unit.Name} ({unit.Id}): ordered MoveTo but is a formation follower - " +
                                 "movement comes from its leader, so the order likely had no effect");
                         }
                         else if (unit.WaypointsRemaining == 0)
                         {
                             ignored++;
-                            Plugin.Log.LogWarning(
+                            Problem(picture,
                                 $"[verify] {unit.Name} ({unit.Id}): ordered MoveTo but has no waypoints - order did not take");
                         }
                         break;
@@ -452,7 +471,7 @@ namespace SeaPowerForceAI
                         if (unit.MaxFormationSpeedKnots > 0f && order.SpeedKnots > unit.MaxFormationSpeedKnots)
                         {
                             ignored++;
-                            Plugin.Log.LogWarning(
+                            Problem(picture,
                                 $"[verify] {unit.Name} ({unit.Id}): ordered {order.SpeedKnots:F0}kt but its " +
                                 $"formation is capped at {unit.MaxFormationSpeedKnots:F0}kt by its slowest " +
                                 "member - clamped, not refused");
@@ -460,7 +479,7 @@ namespace SeaPowerForceAI
                         }
 
                         ignored++;
-                        Plugin.Log.LogWarning(
+                        Problem(picture,
                             $"[verify] {unit.Name} ({unit.Id}): ordered {order.SpeedKnots:F0}kt " +
                             $"but commanded speed is {unit.CommandedSpeedKnots:F0}kt - order did not take");
                         break;
@@ -470,7 +489,7 @@ namespace SeaPowerForceAI
                             && !string.Equals(unit.WeaponStatus, order.WeaponStatus, StringComparison.OrdinalIgnoreCase))
                         {
                             ignored++;
-                            Plugin.Log.LogWarning(
+                            Problem(picture,
                                 $"[verify] {unit.Name} ({unit.Id}): ordered weapons {order.WeaponStatus} " +
                                 $"but posture is {unit.WeaponStatus} - order did not take");
                         }

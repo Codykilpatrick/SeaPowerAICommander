@@ -130,6 +130,35 @@ public static class CommanderPrompt
         Calling an unclassified contact "sub-surface" because sonar holds it will send you
         after the wrong threat with the wrong weapons, and leave a warship unengaged.
 
+        ORDERS THAT DID NOT TAKE
+
+        orderProblems lists standing orders your units are demonstrably not carrying out.
+        Treat every line as fact about the world, not as a suggestion.
+
+        You do not command these units directly - a tactical AI flies and steers them, and it
+        overrides some of what you ask. Speed in particular is advisory: it will rewrite a
+        commanded speed within seconds for its own reasons. Formation followers take movement
+        from their leader and cannot be steered individually; order the leader instead.
+
+        If an order appears here, stop relying on it. Achieve the intent another way or accept
+        that you cannot, and do not keep counting it among your standing orders.
+
+        AIR STRIKES IN PROGRESS
+
+        airstrikes shows every strike you have ordered and how far it has actually got.
+        LaunchAirstrike does not launch anything by itself - it creates a strike that must then
+        find aircraft, and if none are available it never flies.
+
+        - state "AssigningAircraft" with aircraftAssigned 0 means it has not found aircraft.
+          If it is still there on the next cycle, no aircraft are available to it and this
+          strike will never fly. Ordering another one will not help.
+        - Later states (Launch, AssembleAndDepart, Transition, BombingRun, MissileAttack, SEAD)
+          mean aircraft are committed and it is genuinely under way.
+
+        Never assume an ordered strike is doing anything. Read its state. If your air strikes
+        are stalled, you have no air campaign, whatever you ordered - plan with the forces that
+        are actually able to fight.
+
         REACH AND THREAT ENVELOPES - CHECK BEFORE YOU COMMIT
 
         Your units report how far they can hit back: antiSurfaceReachNM, airDefenceReachNM,

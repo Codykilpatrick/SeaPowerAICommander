@@ -126,6 +126,21 @@ namespace SeaPowerForceAI.Picture
         /// its standing orders are. -1 on the first decision of a mission.
         /// </summary>
         public float SecondsSinceLastDecision = -1f;
+
+        /// <summary>
+        /// Standing orders that the units are demonstrably not carrying out, in plain words.
+        /// Without this the commander plans against its own intentions: it has no way to learn
+        /// that the tactical AI rewrote a speed, that a formation follower cannot be steered,
+        /// or that an order it is still counting on quietly did nothing.
+        /// </summary>
+        public List<string> OrderProblems = new List<string>();
+
+        /// <summary>
+        /// Air strikes this task force has going, and how far each has actually got. A strike
+        /// is asynchronous - the order only creates it, and it can sit unable to find aircraft
+        /// forever while looking, from the outside, exactly like one that is on its way.
+        /// </summary>
+        public List<AirstrikeStatus> Airstrikes = new List<AirstrikeStatus>();
     }
 
     public class EnvironmentConditions
@@ -346,5 +361,27 @@ namespace SeaPowerForceAI.Picture
         /// cover. Null when terrain could not be sampled.
         /// </summary>
         public float? TerrainOnBearingM;
+    }
+
+    /// <summary>How far an ordered air strike has actually got.</summary>
+    public class AirstrikeStatus
+    {
+        /// <summary>Contact id the strike is aimed at, when it is one this force holds.</summary>
+        public int TargetContactId;
+
+        /// <summary>Bomb, Missile, SEAD or Jam.</summary>
+        public string StrikeType;
+
+        /// <summary>
+        /// The strike's own state. "AssigningAircraft" means it has not found aircraft yet -
+        /// if it stays there, none are available and nothing will ever fly.
+        /// </summary>
+        public string State;
+
+        /// <summary>Seconds since the strike was ordered.</summary>
+        public float AgeSeconds;
+
+        /// <summary>Aircraft actually committed to it.</summary>
+        public int AircraftAssigned;
     }
 }
