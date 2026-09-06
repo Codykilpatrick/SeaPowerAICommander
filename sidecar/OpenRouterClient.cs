@@ -21,6 +21,16 @@ public sealed class OpenRouterClient : IDisposable
     private readonly HttpClient _http;
     private readonly string _model;
 
+    /// <summary>
+    /// Ceiling on reasoning tokens per decision. Left unbounded, reasoning grows with how
+    /// hard the tactical situation is - measured at ~700 tokens with nothing in contact and
+    /// an extrapolated ~7,500 in a six-contact engagement, which is where decisions began
+    /// arriving after the game had stopped listening. A commander that answers late has not
+    /// answered. Tune with FORCEAI_REASONING_TOKENS; 0 removes the ceiling.
+    /// </summary>
+    private readonly int _reasoningMaxTokens =
+        int.TryParse(Environment.GetEnvironmentVariable("FORCEAI_REASONING_TOKENS"), out var r) ? r : 2048;
+
     public OpenRouterClient(string apiKey, string model, TimeSpan timeout)
     {
         _model = model;
@@ -84,6 +94,9 @@ public sealed class OpenRouterClient : IDisposable
                 },
             },
         };
+
+        if (_reasoningMaxTokens > 0)
+            body["reasoning"] = new JsonObject { ["max_tokens"] = _reasoningMaxTokens };
 
         using var content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
         using var response = await _http.PostAsync(Endpoint, content, ct).ConfigureAwait(false);
