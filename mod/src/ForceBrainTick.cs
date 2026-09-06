@@ -125,6 +125,10 @@ namespace SeaPowerForceAI
             if (state.Brain == null)
                 state.Brain = Plugin.CreateBrain();
 
+            // Release any coordinated shots whose moment has arrived. Must run every tick,
+            // not just on decision ticks - the schedule is in game seconds, not decisions.
+            AttackScheduler.Pump();
+
             // Apply anything the brain finished since the last tick. Do this before
             // submitting, so a slow brain still gets its orders in promptly.
             ForceOrderSet ready;

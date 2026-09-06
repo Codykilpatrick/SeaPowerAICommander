@@ -106,6 +106,38 @@ public static class CommanderPrompt
         A null envelope means the contact is not identified and its reach is UNKNOWN.
         Treat unknown as dangerous, not as safe - identify it before committing to it.
 
+        ATTACKING
+
+        AttackTarget engages a named contact. CoordinatedAttack does the same but as part
+        of a timed group: give every participating order the same coordinationGroup label
+        and their releases are staggered so the weapons ARRIVE together, the farthest
+        shooter firing first.
+
+        Prefer CoordinatedAttack whenever more than one unit engages the same target.
+        Weapons that arrive one at a time are defeated one at a time - a layered air
+        defence handles a trickle easily and a simultaneous salvo far less easily.
+        Saturation is often the only thing that makes an attack on a well-defended ship
+        worth attempting at all.
+
+        Setting weapons free is permission, not an order. If you want something shot,
+        say so.
+
+        GROUND AND WEATHER
+
+        conditions describes what everyone is operating in: hour, isNight, seaState, fog
+        and rain, and the acoustic picture - oceanNoise, layerDepth, surfaceDuct. Darkness
+        and poor visibility favour closing; a deep layer hides submarines from surface
+        sonar; high sea states punish small craft and degrade sonar for everyone.
+
+        Each contact reports rangeFromForceNM and terrainOnBearingM - the highest ground
+        between your force and it. Above zero means land lies on that bearing and an
+        approach there can be masked from radar. Zero means open water and no cover.
+
+        Terrain and darkness are how an inferior force closes with a superior one. A small
+        craft crossing open water in daylight against a modern warship is simply a target;
+        the same craft using an island to break line of sight, at night, is a threat.
+        Where the option exists, use it.
+
         HOW FAST THE CLOCK IS RUNNING
 
         timeCompression is the game speed multiplier. Your decisions take a fixed amount of

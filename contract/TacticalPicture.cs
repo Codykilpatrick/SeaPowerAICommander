@@ -31,6 +31,14 @@ namespace SeaPowerForceAI.Picture
         /// </summary>
         public float TimeCompression = 1f;
 
+        /// <summary>
+        /// Conditions the whole force is operating in. Night, fog and sea state change
+        /// what an approach costs; layer depth and ocean noise decide whether a submarine
+        /// is findable at all. A commander blind to these is missing the main variable in
+        /// several of its domains.
+        /// </summary>
+        public EnvironmentConditions Conditions = new EnvironmentConditions();
+
         public List<OwnUnit> OwnUnits = new List<OwnUnit>();
 
         /// <summary>Detected contacts. A contact is not necessarily identified or classified.</summary>
@@ -68,6 +76,36 @@ namespace SeaPowerForceAI.Picture
         /// its standing orders are. -1 on the first decision of a mission.
         /// </summary>
         public float SecondsSinceLastDecision = -1f;
+    }
+
+    public class EnvironmentConditions
+    {
+        /// <summary>Local hour, 0-23.</summary>
+        public int Hour;
+        public int Minutes;
+
+        /// <summary>Derived from the hour. Darkness favours a close approach.</summary>
+        public bool IsNight;
+
+        /// <summary>Sea state. High states degrade small-boat operations and sonar alike.</summary>
+        public int SeaState;
+
+        public bool IsFog;
+        public bool IsRaining;
+        public bool IsSnowing;
+        public bool IsLightning;
+
+        // ---- Acoustic conditions ----
+        // These decide whether a submarine is findable. Ignoring them makes ASW guesswork.
+
+        /// <summary>Ambient ocean noise. Higher masks passive detection both ways.</summary>
+        public float OceanNoise;
+
+        /// <summary>Depth of the thermal layer. A submarine below it is far harder to hold.</summary>
+        public float LayerDepth;
+
+        /// <summary>Surface duct strength - can carry sound far beyond normal range.</summary>
+        public float SurfaceDuct;
     }
 
     public class LostUnit
@@ -194,5 +232,17 @@ namespace SeaPowerForceAI.Picture
 
         /// <summary>How far this contact can reach a submarine, in nautical miles.</summary>
         public float? AntiSubmarineRangeNM;
+
+        /// <summary>Range from the force centre to this contact, in nautical miles.</summary>
+        public float RangeFromForceNM;
+
+        /// <summary>
+        /// Highest terrain in metres on the bearing from the force centre to this contact.
+        ///
+        /// Above zero means land lies between - an approach on this bearing can be masked,
+        /// which is the whole basis of a coastal attack. Zero means open water and no
+        /// cover. Null when terrain could not be sampled.
+        /// </summary>
+        public float? TerrainOnBearingM;
     }
 }

@@ -20,6 +20,26 @@ namespace SeaPowerForceAI.Orders
 
         /// <summary>Weapons Tight / Free / Hold.</summary>
         SetWeaponStatus,
+
+        /// <summary>
+        /// Engage a specific contact now.
+        ///
+        /// Until this existed the commander could only set weapons free and hope the
+        /// tactical AI picked the target it had in mind. It could position a force
+        /// perfectly and still not be able to say what to shoot.
+        /// </summary>
+        AttackTarget,
+
+        /// <summary>
+        /// Engage a contact as part of a simultaneous attack.
+        ///
+        /// Orders sharing a CoordinationGroup are held until every unit in the group is
+        /// ready, then released together. Against a defended target this is the only
+        /// thing that changes the arithmetic - weapons arriving one at a time are
+        /// defeated one at a time, which is precisely how a fast attack craft force dies
+        /// piecemeal.
+        /// </summary>
+        CoordinatedAttack,
     }
 
     public static class ForceOrderKinds
@@ -44,8 +64,13 @@ namespace SeaPowerForceAI.Orders
                 case ForceOrderKind.MoveTo:
                     return true;
 
+                // Attacks name a contact, not a position - the tactical AI re-resolves
+                // where that contact actually is when it engages, so a stale decision
+                // does not put a weapon at old coordinates.
                 case ForceOrderKind.SetSpeed:
                 case ForceOrderKind.SetWeaponStatus:
+                case ForceOrderKind.AttackTarget:
+                case ForceOrderKind.CoordinatedAttack:
                     return false;
 
                 default:
@@ -71,6 +96,19 @@ namespace SeaPowerForceAI.Orders
 
         // SetWeaponStatus - "Tight" | "Free" | "Hold"
         public string WeaponStatus;
+
+        // AttackTarget / CoordinatedAttack
+        /// <summary>Contact id to engage. Must be a contact, never one of your own units.</summary>
+        public int TargetContactId;
+
+        /// <summary>How many rounds or missiles to commit. 1 if unspecified.</summary>
+        public int Salvo;
+
+        /// <summary>
+        /// CoordinatedAttack only. Free-form label; every order sharing it is released
+        /// together once all its units are ready.
+        /// </summary>
+        public string CoordinationGroup;
 
         /// <summary>Free text for the log. Useful when a brain should explain itself.</summary>
         public string Reason;

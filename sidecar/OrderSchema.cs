@@ -57,6 +57,21 @@ public static class OrderSchema
                     ["enum"] = new JsonArray("Tight", "Free", "Hold"),
                     ["description"] = "SetWeaponStatus only. Use \"Tight\" for other order kinds.",
                 },
+                ["targetContactId"] = new JsonObject
+                {
+                    ["type"] = "integer",
+                    ["description"] = "AttackTarget and CoordinatedAttack only. Id of a CONTACT from the contacts list - never one of your own units. Use 0 for other order kinds.",
+                },
+                ["salvo"] = new JsonObject
+                {
+                    ["type"] = "integer",
+                    ["description"] = "AttackTarget and CoordinatedAttack only. How many rounds or missiles to commit. Use 1 for other order kinds.",
+                },
+                ["coordinationGroup"] = new JsonObject
+                {
+                    ["type"] = "string",
+                    ["description"] = "CoordinatedAttack only. A label shared by every unit in one simultaneous attack, e.g. \"strike-alpha\". Their releases are timed so the weapons arrive together. Use \"\" for other order kinds.",
+                },
                 ["reason"] = new JsonObject
                 {
                     ["type"] = "string",
@@ -66,7 +81,8 @@ public static class OrderSchema
             // Strict mode requires every property listed as required, hence the
             // "use 0 / use Tight" notes above for fields a given kind ignores.
             ["required"] = new JsonArray(
-                "kind", "unitId", "latitude", "longitude", "speedKnots", "weaponStatus", "reason"),
+                "kind", "unitId", "latitude", "longitude", "speedKnots", "weaponStatus",
+                "targetContactId", "salvo", "coordinationGroup", "reason"),
             ["additionalProperties"] = false,
         };
 

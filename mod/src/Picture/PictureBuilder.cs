@@ -52,9 +52,63 @@ namespace SeaPowerForceAI.Picture
             AddOwnUnits(picture, tf._taskforceHelicopters, "Helicopter");
             AddOwnUnits(picture, tf._taskforceLandUnits, "LandUnit");
 
+            ApplyConditions(picture);
             AddContacts(picture, tf);
 
             return picture;
+        }
+
+        private static void ApplyConditions(TacticalPicture picture)
+        {
+            try
+            {
+                var env = Singleton<SeaPower.Environment>.Instance;
+                if (env == null) return;
+
+                var c = picture.Conditions;
+                c.Hour = env.Hour;
+                c.Minutes = env.Minutes;
+                c.IsNight = env.Hour < 6 || env.Hour >= 20;
+                c.SeaState = env.SeaState;
+                c.IsFog = env.IsFog;
+                c.IsRaining = env.IsRaining;
+                c.IsSnowing = env.IsSnowing;
+                c.IsLightning = env.IsLightning;
+
+                c.OceanNoise = Finite(env.CurrentOceanNoise);
+                c.LayerDepth = Finite(env.CurrentLayerDepth);
+
+                // Sampled at the force centre - ducting is position-dependent.
+                var centre = ForceCentre(picture);
+                if (centre.HasValue)
+                    c.SurfaceDuct = Finite(env.getSurfaceDuct(centre.Value));
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.LogWarning($"[picture] conditions unreadable: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Mean position of the force's surface and subsurface units, used as the origin
+        /// for range and terrain-masking queries. Aircraft are excluded - they wander far
+        /// from the group and would drag the centre with them.
+        /// </summary>
+        private static GeoPosition? ForceCentre(TacticalPicture picture)
+        {
+            double lat = 0.0, lon = 0.0;
+            var count = 0;
+
+            foreach (var u in picture.OwnUnits)
+            {
+                if (u.Category == "Aircraft" || u.Category == "Helicopter") continue;
+                lat += u.Latitude;
+                lon += u.Longitude;
+                count++;
+            }
+
+            if (count == 0) return null;
+            return new GeoPosition(lat / count, lon / count);
         }
 
         private static void AddOwnUnits(TacticalPicture picture, List<ObjectBase> units, string category)
@@ -194,6 +248,45 @@ namespace SeaPowerForceAI.Picture
         /// known, and a threat library follows. An unidentified contact reports null,
         /// which should make it more frightening rather than less.
         /// </summary>
+        /// <summary>
+        /// Range to the contact and the highest terrain between us and it.
+        ///
+        /// Land on the bearing means an approach can be masked, which is the entire basis
+        /// of a coastal attack against a superior force. Only meaningful for a contact
+        /// whose position we actually hold - a bearing-only track has no bearing geometry
+        /// worth sampling.
+        /// </summary>
+        private static void ApplyTerrain(Contact contact, GeoPosition? centreOrNull)
+        {
+            if (!centreOrNull.HasValue) return;
+            if (!contact.Latitude.HasValue || !contact.Longitude.HasValue) return;
+
+            var centre = centreOrNull.Value;
+
+            try
+            {
+                var target = new GeoPosition(contact.Latitude.Value, contact.Longitude.Value);
+
+                var rangeNM = (float)centre.getDistanceInMiles(target);
+                contact.RangeFromForceNM = Finite(rangeNM);
+
+                var heading = centre.CourseTo(target);
+
+                // Bound the sample to the target - the query walks the bearing in small
+                // steps, so an unbounded distance would be needlessly expensive.
+                var highest = TerrainUtils.CrudeGetHighestTerrainHeightAhead(
+                    centre, heading, (float)centre.GetDistance(target));
+
+                // The game returns a large negative sentinel when terrain is disabled.
+                if (highest > -9000f)
+                    contact.TerrainOnBearingM = Finite(highest);
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.LogWarning($"[picture] terrain unreadable for contact {contact.Id}: {ex.Message}");
+            }
+        }
+
         private static void ApplyThreatEnvelope(Contact contact, Vehicle veh, ObjectBase obj)
         {
             if (!contact.Identified) return;
@@ -231,6 +324,7 @@ namespace SeaPowerForceAI.Picture
 
             picture.PlotEntries = vehicles.Count;
 
+            var centre = ForceCentre(picture);
             int skipNullVehicle = 0, skipNoObject = 0, skipOwn = 0;
 
             foreach (var veh in vehicles)
@@ -258,6 +352,7 @@ namespace SeaPowerForceAI.Picture
                 ApplyPosition(contact, veh);
                 ApplyVelocity(contact, veh);
                 ApplyThreatEnvelope(contact, veh, obj);
+                ApplyTerrain(contact, centre);
 
                 picture.Contacts.Add(contact);
             }

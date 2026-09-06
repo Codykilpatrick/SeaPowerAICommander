@@ -27,9 +27,41 @@ namespace SeaPowerForceAI.Orders
             var byId = IndexOwnUnits(tf);
             int rejected = 0;
 
+            // Coordinated attacks are planned as a group, not executed one by one - the
+            // whole point is that their release times depend on each other.
+            var groups = new Dictionary<string, List<ForceOrder>>();
+            foreach (var order in set.Orders)
+            {
+                if (order == null || order.Kind != ForceOrderKind.CoordinatedAttack) continue;
+
+                var key = string.IsNullOrEmpty(order.CoordinationGroup) ? "default" : order.CoordinationGroup;
+                List<ForceOrder> members;
+                if (!groups.TryGetValue(key, out members))
+                {
+                    members = new List<ForceOrder>();
+                    groups[key] = members;
+                }
+                members.Add(order);
+            }
+
+            foreach (var group in groups)
+            {
+                var scheduled = AttackScheduler.Schedule(
+                    group.Key,
+                    group.Value,
+                    id => { ObjectBase u; return byId.TryGetValue(id, out u) ? u : null; },
+                    id => ResolveContact(tf, id));
+
+                accepted.AddRange(scheduled);
+                rejected += group.Value.Count - scheduled.Count;
+            }
+
             foreach (var order in set.Orders)
             {
                 if (order == null) { rejected++; continue; }
+
+                // Already handled above as part of a coordination group.
+                if (order.Kind == ForceOrderKind.CoordinatedAttack) continue;
 
                 ObjectBase unit;
                 if (!byId.TryGetValue(order.UnitId, out unit))
@@ -71,6 +103,10 @@ namespace SeaPowerForceAI.Orders
 
                 case ForceOrderKind.SetWeaponStatus:
                     return SetWeaponStatus(unit, order);
+
+                case ForceOrderKind.AttackTarget:
+                case ForceOrderKind.CoordinatedAttack:
+                    return AttackTarget(unit, order);
 
                 default:
                     Plugin.Log.LogWarning($"[orders] unknown kind {order.Kind}");
@@ -114,6 +150,65 @@ namespace SeaPowerForceAI.Orders
             var knots = (max > 0f && order.SpeedKnots > max) ? max : order.SpeedKnots;
 
             unit.SetSpeedCommand(new ConstantSpeed(knots, unit));
+            return true;
+        }
+
+        /// <summary>
+        /// Engage a named contact.
+        ///
+        /// The target is resolved through the task force's OWN plotting table, never the
+        /// global object list. A commander cannot order an attack on something it has not
+        /// detected, which is the same rule the rest of the picture obeys - and the rule
+        /// the shipped air-strike code breaks.
+        /// </summary>
+        /// <summary>
+        /// Finds a contact in the task force's OWN plotting table.
+        ///
+        /// Never the global object list. A commander cannot order an attack on something
+        /// it has not detected - the same rule the rest of the picture obeys, and the one
+        /// the shipped air-strike code breaks.
+        /// </summary>
+        internal static ObjectBase ResolveContact(Taskforce tf, int contactId)
+        {
+            var plot = tf != null ? tf.PlottingTable : null;
+            if (plot == null) return null;
+
+            foreach (var veh in plot.Vehicles)
+            {
+                if (veh == null) continue;
+                var obj = veh.Object;
+                if (obj == null || obj.IsDestroyed) continue;
+                if (obj.UniqueID != contactId) continue;
+
+                // Refuse to turn our own guns on ourselves.
+                if (obj._taskforce == tf) return null;
+
+                return obj;
+            }
+
+            return null;
+        }
+
+        private static bool AttackTarget(ObjectBase unit, ForceOrder order)
+        {
+            var tf = unit._taskforce;
+
+            var target = ResolveContact(tf, order.TargetContactId);
+            if (target == null)
+            {
+                Plugin.Log.LogWarning(
+                    $"[orders] {order.Kind}: contact {order.TargetContactId} not held by this task force");
+                return false;
+            }
+
+            if (unit._ai == null)
+            {
+                Plugin.Log.LogWarning($"[orders] {order.Kind}: {unit.getName()} has no AI to engage with");
+                return false;
+            }
+
+            var salvo = order.Salvo > 0 ? order.Salvo : 1;
+            unit._ai.AutoAttackByClick(target, Ammunition.Type.None, ignoreExecuting: false, salvo: salvo);
             return true;
         }
 

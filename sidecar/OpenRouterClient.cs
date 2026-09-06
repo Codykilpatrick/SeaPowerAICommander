@@ -106,6 +106,9 @@ public sealed class OpenRouterClient : IDisposable
                 Longitude = o["longitude"]?.GetValue<double>() ?? 0.0,
                 SpeedKnots = (float)(o["speedKnots"]?.GetValue<double>() ?? 0.0),
                 WeaponStatus = o["weaponStatus"]?.GetValue<string>() ?? "Tight",
+                TargetContactId = (int)(o["targetContactId"]?.GetValue<double>() ?? 0),
+                Salvo = (int)(o["salvo"]?.GetValue<double>() ?? 1),
+                CoordinationGroup = o["coordinationGroup"]?.GetValue<string>() ?? string.Empty,
                 Reason = o["reason"]?.GetValue<string>() ?? string.Empty,
             });
         }
