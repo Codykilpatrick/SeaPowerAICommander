@@ -78,41 +78,94 @@ namespace SeaPowerForceAI.Picture
                     ? "(unknown)"
                     : System.IO.Path.GetFileNameWithoutExtension(path);
 
+                // Runtime objectives first, when a mission populates them.
                 var mm = Singleton<MissionManager>.Instance;
-                if (mm == null || mm.Objectives == null) return;
-
-                foreach (var objective in mm.Objectives)
+                if (mm != null && mm.Objectives != null)
                 {
-                    if (objective == null) continue;
-                    if (string.IsNullOrWhiteSpace(objective.Text)) continue;
+                    foreach (var objective in mm.Objectives)
+                    {
+                        if (objective == null) continue;
+                        if (string.IsNullOrWhiteSpace(objective.Text)) continue;
+                        if (objective._isCanceled) continue;
 
-                    // Cancelled objectives describe a situation that no longer applies.
-                    if (objective._isCanceled) continue;
-
-                    picture.OpposingObjectives.Add(objective.Text);
+                        picture.OpposingObjectives.Add(objective.Text);
+                    }
                 }
 
-                // Report it. With no objectives read there is nothing to derive a mission
-                // from, the commander falls back to bare survival, and the resulting
-                // permanent withdrawal looks exactly like a considered decision.
-                if (picture.OpposingObjectives.Count == 0)
+                // Most missions leave that collection empty - Hormuz has none at all - but
+                // the mission file itself carries a neutral Description of the situation
+                // and the other task forces' opening orders. That is a better source
+                // anyway: the Description sets up BOTH sides rather than stating either
+                // one's plan.
+                ReadMissionFile(picture, path);
+
+                if (string.IsNullOrWhiteSpace(picture.MissionDescription) && picture.OpposingObjectives.Count == 0)
                 {
                     Plugin.Log.LogWarning(
-                        $"[mission] {picture.MissionName}: no readable objectives " +
-                        $"({mm.Objectives.Count} present but none usable) - the force has NO mission " +
-                        "and will optimise for survival. Set ForceObjective in the config to fix.");
+                        $"[mission] {picture.MissionName}: nothing readable in the mission file or " +
+                        "objectives - the force has NO mission and will optimise for survival.");
                 }
                 else
                 {
                     Plugin.Log.LogInfo(
-                        $"[mission] {picture.MissionName}: read {picture.OpposingObjectives.Count} " +
-                        "opposing objective(s) to derive from");
+                        $"[mission] {picture.MissionName}: description {picture.MissionDescription?.Length ?? 0} chars, " +
+                        $"{picture.OpposingObjectives.Count} opposing objective(s)");
                 }
             }
             catch (Exception ex)
             {
                 Plugin.Log.LogWarning($"[picture] mission unreadable: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Pulls the English Description and the other task forces' opening orders out of
+        /// the mission ini.
+        ///
+        /// Only the header matters, so reading stops once past it - these files run to
+        /// tens of thousands of lines of unit placements. The Description is written from
+        /// a neutral standpoint and names what both sides are trying to do, which is why
+        /// it is a fair thing to infer this force's mission from.
+        /// </summary>
+        private static void ReadMissionFile(TacticalPicture picture, string path)
+        {
+            if (string.IsNullOrEmpty(path) || !System.IO.File.Exists(path)) return;
+
+            var inEnglish = false;
+            var description = new System.Text.StringBuilder();
+
+            foreach (var raw in System.IO.File.ReadLines(path, System.Text.Encoding.UTF8))
+            {
+                var line = raw.Trim();
+
+                if (line.StartsWith("[") && line.EndsWith("]"))
+                {
+                    // Unit placement sections start well after the localised header.
+                    if (inEnglish) break;
+                    inEnglish = line.Equals("[Language_en]", StringComparison.OrdinalIgnoreCase);
+                    continue;
+                }
+
+                if (!inEnglish) continue;
+
+                if (line.StartsWith("Description=", StringComparison.OrdinalIgnoreCase))
+                {
+                    description.Append(line.Substring("Description=".Length));
+                }
+                else if (line.IndexOf("StartMessage=", StringComparison.OrdinalIgnoreCase) > 0)
+                {
+                    // "Taskforce1StartMessage=Hormuz|Commander, you need to..." - the part
+                    // before the pipe is a title, the rest is the orders.
+                    var value = line.Substring(line.IndexOf('=') + 1);
+                    var pipe = value.IndexOf('|');
+                    if (pipe >= 0) value = value.Substring(pipe + 1);
+
+                    if (!string.IsNullOrWhiteSpace(value))
+                        picture.OpposingObjectives.Add(value.Trim());
+                }
+            }
+
+            picture.MissionDescription = description.ToString().Trim();
         }
 
         private static void ApplyConditions(TacticalPicture picture)

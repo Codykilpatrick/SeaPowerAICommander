@@ -58,16 +58,29 @@ public static class ObjectiveDeriver
         if (Cache.TryGetValue(key, out var cached))
             return cached;
 
-        if (picture.OpposingObjectives.Count == 0)
+        var hasDescription = !string.IsNullOrWhiteSpace(picture.MissionDescription);
+        if (!hasDescription && picture.OpposingObjectives.Count == 0)
             return string.Empty;
 
         var sb = new StringBuilder();
         sb.AppendLine($"Scenario: {picture.MissionName}");
         sb.AppendLine($"You are writing orders for the {picture.Side} side.");
         sb.AppendLine();
-        sb.AppendLine("The other side's briefing states:");
-        foreach (var o in picture.OpposingObjectives)
-            sb.AppendLine($"  - {o}");
+
+        if (hasDescription)
+        {
+            // Neutral setup naming both sides - the best evidence of the situation.
+            sb.AppendLine("The scenario is described as:");
+            sb.AppendLine(picture.MissionDescription);
+            sb.AppendLine();
+        }
+
+        if (picture.OpposingObjectives.Count > 0)
+        {
+            sb.AppendLine("The other side's orders read:");
+            foreach (var o in picture.OpposingObjectives)
+                sb.AppendLine($"  - {o}");
+        }
 
         try
         {

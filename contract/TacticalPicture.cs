@@ -40,6 +40,15 @@ namespace SeaPowerForceAI.Picture
         public string MissionName;
 
         /// <summary>
+        /// The scenario's own description, as written in the mission file.
+        ///
+        /// Neutral by construction - it sets up the situation and names what both sides
+        /// are trying to do, rather than stating either one's plan. That makes it the
+        /// right thing to infer a mission from.
+        /// </summary>
+        public string MissionDescription;
+
+        /// <summary>
         /// The OPPOSING side's stated objectives, as written in the mission.
         ///
         /// Present so an objective can be derived for this force when none was configured:
