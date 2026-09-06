@@ -88,7 +88,41 @@ namespace SeaPowerForceAI.Orders
             if (accepted.Count > 0 || rejected > 0)
                 Plugin.Log.LogInfo($"[orders] {tf._nameInMissionFile}: applied {accepted.Count}, rejected {rejected}");
 
+            // A count alone cannot be checked against what the units actually do. Every
+            // accepted order says what it was and why, so the log can be read back against
+            // observed behaviour instead of inferred from it.
+            foreach (var order in accepted)
+            {
+                ObjectBase target;
+                var who = byId.TryGetValue(order.UnitId, out target)
+                    ? $"{target.getName()} ({order.UnitId})"
+                    : order.UnitId.ToString();
+                Plugin.Log.LogInfo($"[order] {Describe(order)} <- {who}: {order.Reason}");
+            }
+
             return accepted;
+        }
+
+        /// <summary>The order's own parameters, so the log says what was asked, not just how many.</summary>
+        private static string Describe(ForceOrder order)
+        {
+            switch (order.Kind)
+            {
+                case ForceOrderKind.MoveTo:
+                    return $"MoveTo {order.Latitude:F4},{order.Longitude:F4}";
+                case ForceOrderKind.SetSpeed:
+                    return $"SetSpeed {order.SpeedKnots:F0}kt";
+                case ForceOrderKind.SetWeaponStatus:
+                    return $"SetWeaponStatus {order.WeaponStatus}";
+                case ForceOrderKind.AttackTarget:
+                    return $"AttackTarget contact {order.TargetContactId} salvo {order.Salvo}";
+                case ForceOrderKind.CoordinatedAttack:
+                    return $"CoordinatedAttack[{order.CoordinationGroup}] contact {order.TargetContactId} salvo {order.Salvo}";
+                case ForceOrderKind.LaunchAirstrike:
+                    return $"LaunchAirstrike {order.StrikeType} contact {order.TargetContactId}";
+                default:
+                    return order.Kind.ToString();
+            }
         }
 
         private static bool ApplyOne(ObjectBase unit, ForceOrder order)
