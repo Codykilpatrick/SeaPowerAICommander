@@ -53,10 +53,66 @@ namespace SeaPowerForceAI.Picture
             AddOwnUnits(picture, tf._taskforceHelicopters, "Helicopter");
             AddOwnUnits(picture, tf._taskforceLandUnits, "LandUnit");
 
+            ApplyMission(picture);
             ApplyConditions(picture);
             AddContacts(picture, tf);
 
             return picture;
+        }
+
+        /// <summary>
+        /// Mission identity, and the opposing side's stated objectives.
+        ///
+        /// The objectives in MissionManager are authored for the player. They are carried
+        /// here only so an objective can be inferred for this force when none was
+        /// configured - the scenario author designed both sides, so the opposing briefing
+        /// is the best evidence of what the situation actually is. It is never given to
+        /// the commander as intelligence.
+        /// </summary>
+        private static void ApplyMission(TacticalPicture picture)
+        {
+            try
+            {
+                var path = Globals.currentMissionFilePath;
+                picture.MissionName = string.IsNullOrEmpty(path)
+                    ? "(unknown)"
+                    : System.IO.Path.GetFileNameWithoutExtension(path);
+
+                var mm = Singleton<MissionManager>.Instance;
+                if (mm == null || mm.Objectives == null) return;
+
+                foreach (var objective in mm.Objectives)
+                {
+                    if (objective == null) continue;
+                    if (string.IsNullOrWhiteSpace(objective.Text)) continue;
+
+                    // Cancelled objectives describe a situation that no longer applies.
+                    if (objective._isCanceled) continue;
+
+                    picture.OpposingObjectives.Add(objective.Text);
+                }
+
+                // Report it. With no objectives read there is nothing to derive a mission
+                // from, the commander falls back to bare survival, and the resulting
+                // permanent withdrawal looks exactly like a considered decision.
+                if (picture.OpposingObjectives.Count == 0)
+                {
+                    Plugin.Log.LogWarning(
+                        $"[mission] {picture.MissionName}: no readable objectives " +
+                        $"({mm.Objectives.Count} present but none usable) - the force has NO mission " +
+                        "and will optimise for survival. Set ForceObjective in the config to fix.");
+                }
+                else
+                {
+                    Plugin.Log.LogInfo(
+                        $"[mission] {picture.MissionName}: read {picture.OpposingObjectives.Count} " +
+                        "opposing objective(s) to derive from");
+                }
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.LogWarning($"[picture] mission unreadable: {ex.Message}");
+            }
         }
 
         private static void ApplyConditions(TacticalPicture picture)

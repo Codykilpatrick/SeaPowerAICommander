@@ -36,6 +36,20 @@ namespace SeaPowerForceAI.Picture
         /// </summary>
         public string Objective;
 
+        /// <summary>Mission file name, used to cache a derived objective for the mission.</summary>
+        public string MissionName;
+
+        /// <summary>
+        /// The OPPOSING side's stated objectives, as written in the mission.
+        ///
+        /// Present so an objective can be derived for this force when none was configured:
+        /// the scenario author designed both sides, and the opposing briefing is the best
+        /// available evidence of what the situation is. Used once, to infer a posture -
+        /// never handed to the commander as intelligence, and never mirrored down to
+        /// specifics like unit names or positions this side would have no way to know.
+        /// </summary>
+        public List<string> OpposingObjectives = new List<string>();
+
         /// <summary>
         /// Game speed multiplier (1, 2, 3, 5, 10). This is not cosmetic: a decision takes
         /// real seconds, so at 10x roughly ten times as much game time passes between

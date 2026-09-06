@@ -141,17 +141,14 @@ namespace SeaPowerForceAI
                     "total at or under 15/min, inside OpenRouter's 20/min new-account cap.",
                     new AcceptableValueRange<int>(0, 120000)));
 
-            _cfgForceObjective = _config.Bind("Brain", "ForceObjective",
-                "Contest this area and prevent hostile forces operating freely in it. " +
-                "Preserve your force where you can, but accept risk in proportion to what " +
-                "you can actually achieve - withdrawing intact while achieving nothing is " +
-                "a failure, not a success.",
-                "What the AI force is trying to achieve. Set this per scenario - it is the " +
-                "single biggest influence on how the commander behaves. Given no objective " +
-                "it optimises purely for survival, which means withdrawing every time it " +
-                "is outranged, however good its tactical reasoning. This is deliberately " +
-                "NOT taken from the mission's own objectives, which are written for the " +
-                "player and would be the opposing side's plan.");
+            _cfgForceObjective = _config.Bind("Brain", "ForceObjective", "",
+                "What the AI force is trying to achieve - the single biggest influence on " +
+                "how the commander behaves, since with no objective it optimises purely " +
+                "for survival and withdraws every time it is outranged. " +
+                "LEAVE EMPTY to have one derived automatically: the sidecar reads the " +
+                "mission's own objectives once, infers what this side's orders would " +
+                "plausibly have been, and caches the result for that mission. Set a value " +
+                "here only to override that for a scenario you want to author by hand.");
 
             _cfgMaxContactsInPicture = _config.Bind("Brain", "MaxContactsInPicture", 25,
                 new ConfigDescription(
