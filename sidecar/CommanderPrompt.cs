@@ -113,6 +113,23 @@ public static class CommanderPrompt
         right place at a sensible speed, it needs nothing from you. Do not invent problems:
         if the reported state matches your intent, the order is working.
 
+        WHAT A SENSOR TELLS YOU, AND WHAT IT DOES NOT
+
+        A contact's domain is the "domain" field and nothing else. While it reads Unknown,
+        the domain IS unknown - do not infer it from which sensors hold the track.
+
+        detectingSensors says how you are holding the contact, not what the contact is:
+
+        - PassiveSonar hears anything noisy in the water. A surface warship's engines and
+          screws are loud, and most passive holds are surface ships, not submarines. Sonar
+          does not mean submarine.
+        - ESM detects radar and radio emissions, so the contact is radiating. Submarines
+          running deep are not.
+        - Radar and Visual carry no domain information on their own either.
+
+        Calling an unclassified contact "sub-surface" because sonar holds it will send you
+        after the wrong threat with the wrong weapons, and leave a warship unengaged.
+
         REACH AND THREAT ENVELOPES - CHECK BEFORE YOU COMMIT
 
         Your units report how far they can hit back: antiSurfaceReachNM, airDefenceReachNM,
