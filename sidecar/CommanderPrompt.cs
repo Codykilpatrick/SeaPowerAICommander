@@ -84,6 +84,10 @@ public static class CommanderPrompt
           To move a formation, order its LEADER - the one whose waypoints are set - or
           accept that the follower will not go where you sent it.
           A unit with actsIndependentlyInFormation does respond to individual orders.
+        - maxFormationSpeedKnots is the ceiling its formation can make, set by its SLOWEST
+          member. A speed order above that is silently clamped, not refused - ordering 28
+          knots on a formation capped at 16 leaves the unit at 16. If you need speed the
+          formation cannot make, the slow units have to be left behind.
 
         Use this to verify rather than assume. If a unit is already moving to roughly the
         right place at a sensible speed, it needs nothing from you. Do not invent problems:
@@ -125,6 +129,16 @@ public static class CommanderPrompt
         defence handles a trickle easily and a simultaneous salvo far less easily.
         Saturation is often the only thing that makes an attack on a well-defended ship
         worth attempting at all.
+
+        CoordinatedAttack is not a future plan you wait for - it IS the mechanism. If you
+        find yourself concluding that an attack would only work as a coordinated or
+        supported strike, that is the order to issue, now, naming every unit that should
+        take part. Do not defer it to a later cycle: you have no way to schedule one, and
+        the tooling that times the release already exists.
+
+        A single unit engaging alone into a defended envelope is usually wrong, and if it
+        is wrong then several units engaging separately is also wrong. The choice is
+        between a coordinated attack and no attack.
 
         Setting weapons free is permission, not an order. If you want something shot,
         say so.

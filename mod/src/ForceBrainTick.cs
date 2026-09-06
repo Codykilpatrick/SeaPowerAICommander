@@ -361,14 +361,26 @@ namespace SeaPowerForceAI
                     case ForceOrderKind.SetSpeed:
                         // Compare against the COMMANDED speed, not the actual one - a unit
                         // still accelerating is obeying, just not there yet.
-                        if (Math.Abs(unit.CommandedSpeedKnots - order.SpeedKnots) > 2f
-                            && order.SpeedKnots <= unit.MaxSpeedKnots)
+                        if (Math.Abs(unit.CommandedSpeedKnots - order.SpeedKnots) <= 2f) break;
+                        if (order.SpeedKnots > unit.MaxSpeedKnots) break;
+
+                        // A formation caps its members at its slowest hull, so a higher
+                        // order is clamped rather than refused. Report it as the ceiling
+                        // it is, not as a failure.
+                        if (unit.MaxFormationSpeedKnots > 0f && order.SpeedKnots > unit.MaxFormationSpeedKnots)
                         {
                             ignored++;
                             Plugin.Log.LogWarning(
-                                $"[verify] {unit.Name} ({unit.Id}): ordered {order.SpeedKnots:F0}kt " +
-                                $"but commanded speed is {unit.CommandedSpeedKnots:F0}kt - order did not take");
+                                $"[verify] {unit.Name} ({unit.Id}): ordered {order.SpeedKnots:F0}kt but its " +
+                                $"formation is capped at {unit.MaxFormationSpeedKnots:F0}kt by its slowest " +
+                                "member - clamped, not refused");
+                            break;
                         }
+
+                        ignored++;
+                        Plugin.Log.LogWarning(
+                            $"[verify] {unit.Name} ({unit.Id}): ordered {order.SpeedKnots:F0}kt " +
+                            $"but commanded speed is {unit.CommandedSpeedKnots:F0}kt - order did not take");
                         break;
 
                     case ForceOrderKind.SetWeaponStatus:

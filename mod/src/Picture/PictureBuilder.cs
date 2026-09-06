@@ -144,6 +144,7 @@ namespace SeaPowerForceAI.Picture
                         obj.ActsIndependentlyInFormation != null && obj.ActsIndependentlyInFormation.Value,
                 };
 
+                ApplyFormation(unit, obj);
                 ApplyCommandedSpeed(unit, obj);
                 ApplyRoute(unit, obj);
                 ApplyReach(unit, obj);
@@ -157,6 +158,30 @@ namespace SeaPowerForceAI.Picture
         /// The gap between the two is how the commander can tell an order is still being
         /// carried out rather than complete.
         /// </summary>
+        /// <summary>
+        /// The formation ceiling, which is what actually caps a member's speed.
+        ///
+        /// Ordering 28 knots on a formation limited to 16 by its slowest member leaves the
+        /// unit at 16, and from outside that is indistinguishable from the order being
+        /// ignored. It cost three false "order did not take" warnings before the cause was
+        /// clear.
+        /// </summary>
+        private static void ApplyFormation(OwnUnit unit, ObjectBase obj)
+        {
+            try
+            {
+                var formation = obj.Formation;
+                if (formation == null) return;
+
+                if (formation.MaxFormationSpeed != null)
+                    unit.MaxFormationSpeedKnots = Finite(formation.MaxFormationSpeed.Value);
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.LogWarning($"[picture] formation unreadable for {unit.Name}: {ex.Message}");
+            }
+        }
+
         private static void ApplyCommandedSpeed(OwnUnit unit, ObjectBase obj)
         {
             try

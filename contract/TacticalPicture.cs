@@ -157,6 +157,16 @@ namespace SeaPowerForceAI.Picture
         /// </summary>
         public bool ActsIndependentlyInFormation;
 
+        /// <summary>
+        /// Fastest the unit's formation can go, limited by its slowest member. 0 when not
+        /// in a formation.
+        ///
+        /// A speed order above this is silently clamped - ordering 28 knots on a formation
+        /// capped at 16 leaves the unit at 16 and looks like the order was ignored. To go
+        /// faster, the formation has to be broken up or its slow members detached.
+        /// </summary>
+        public float MaxFormationSpeedKnots;
+
         /// <summary>Waypoints still queued. 0 means the unit is not going anywhere.</summary>
         public int WaypointsRemaining;
 
