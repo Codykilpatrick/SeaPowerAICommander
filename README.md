@@ -77,6 +77,10 @@ mod/        net472  - the BepInEx plugin that runs inside the game.
 sidecar/    net8.0  - the out-of-process brain that calls OpenRouter.
 ```
 
+Each has its own README: [`contract/`](contract/README.md) for the shared vocabulary and
+the action space, [`mod/`](mod/README.md) for the in-game plugin and its config,
+[`sidecar/`](sidecar/README.md) for the brain and prompt tuning.
+
 ## The LLM sidecar
 
 Set `Brain.Type = Sidecar` in the config, then run the sidecar alongside the game.
@@ -91,7 +95,7 @@ dotnet run --project sidecar
 | `OPENROUTER_API_KEY` | *(required)* | Your key. Never read by the mod or committed. |
 | `FORCEAI_MODEL` | `anthropic/claude-opus-4.5` | Any OpenRouter model id that supports structured outputs. |
 | `FORCEAI_PREFIX` | `http://127.0.0.1:8787/` | Listener address. Loopback only by design. |
-| `FORCEAI_TIMEOUT_SECONDS` | `90` | Per-decision ceiling. |
+| `FORCEAI_TIMEOUT_SECONDS` | `150` | Per-decision ceiling. Match it to the mod's `SidecarTimeoutMs`. |
 
 Why out-of-process, and not the Anthropic SDK in the plugin: Unity's Mono runtime is
 hostile to modern BCL dependency trees, the API key stays out of a distributed mod, and
