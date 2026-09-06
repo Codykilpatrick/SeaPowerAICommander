@@ -129,6 +129,12 @@ public static class CommanderPrompt
         Setting weapons free is permission, not an order. If you want something shot,
         say so.
 
+        Disengage calls off a unit's current attack while leaving it able to defend
+        itself. Use it when an attack you ordered no longer makes sense - the target
+        turned out to be something else, the range arithmetic changed, or the unit is
+        needed elsewhere. Do NOT use weapons Hold for this: Hold also stops the unit
+        defending itself, which is not what you mean.
+
         GROUND AND WEATHER
 
         conditions describes what everyone is operating in: hour (LOCAL time, not Zulu),

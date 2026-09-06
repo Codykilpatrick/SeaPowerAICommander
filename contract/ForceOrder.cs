@@ -40,6 +40,16 @@ namespace SeaPowerForceAI.Orders
         /// piecemeal.
         /// </summary>
         CoordinatedAttack,
+
+        /// <summary>
+        /// Call off a unit's current attack, leaving it free to defend itself.
+        ///
+        /// Added because the commander needed it and had no way to say it: having ordered
+        /// an attack that identification later revealed to be suicidal, the only tool it
+        /// had for cancelling was weapons-hold - which also stops the unit defending
+        /// itself. Being able to start something you cannot stop is a bad action space.
+        /// </summary>
+        Disengage,
     }
 
     public static class ForceOrderKinds
@@ -71,6 +81,7 @@ namespace SeaPowerForceAI.Orders
                 case ForceOrderKind.SetWeaponStatus:
                 case ForceOrderKind.AttackTarget:
                 case ForceOrderKind.CoordinatedAttack:
+                case ForceOrderKind.Disengage:
                     return false;
 
                 default:

@@ -108,6 +108,9 @@ namespace SeaPowerForceAI.Orders
                 case ForceOrderKind.CoordinatedAttack:
                     return AttackTarget(unit, order);
 
+                case ForceOrderKind.Disengage:
+                    return Disengage(unit);
+
                 default:
                     Plugin.Log.LogWarning($"[orders] unknown kind {order.Kind}");
                     return false;
@@ -209,6 +212,17 @@ namespace SeaPowerForceAI.Orders
 
             var salvo = order.Salvo > 0 ? order.Salvo : 1;
             unit._ai.AutoAttackByClick(target, Ammunition.Type.None, ignoreExecuting: false, salvo: salvo);
+            return true;
+        }
+
+        /// <summary>
+        /// Drops the unit's attack and engagement tasks without touching its weapons
+        /// posture, so it stops prosecuting but can still defend itself.
+        /// </summary>
+        private static bool Disengage(ObjectBase unit)
+        {
+            unit.ClearAttackTasks();
+            unit.ClearEngageTasks();
             return true;
         }
 
