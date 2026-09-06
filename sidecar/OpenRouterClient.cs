@@ -70,6 +70,9 @@ public sealed class OpenRouterClient : IDisposable
             ["messages"] = new JsonArray(
                 new JsonObject { ["role"] = "system", ["content"] = CommanderPrompt.System },
                 new JsonObject { ["role"] = "user", ["content"] = CommanderPrompt.BuildUserMessage(picture) }),
+            // Usage accounting is opt-in on OpenRouter. Without it we cannot tell a slow
+            // decision caused by a large picture from one caused by long reasoning.
+            ["usage"] = new JsonObject { ["include"] = true },
             ["response_format"] = new JsonObject
             {
                 ["type"] = "json_schema",
@@ -91,6 +94,26 @@ public sealed class OpenRouterClient : IDisposable
             throw new InvalidOperationException($"OpenRouter returned {(int)response.StatusCode}: {Truncate(raw, 400)}");
 
         return Parse(raw, picture);
+    }
+
+    /// <summary>
+    /// Prints what the decision cost in tokens. Reasoning tokens are broken out because
+    /// they are the part that grows with how hard the tactical problem is rather than with
+    /// how big the picture is, and they are invisible in the returned text.
+    /// </summary>
+    private static void ReportUsage(JsonObject root)
+    {
+        if (root["usage"] is not JsonObject usage) return;
+
+        var prompt = usage["prompt_tokens"]?.GetValue<int>() ?? 0;
+        var completion = usage["completion_tokens"]?.GetValue<int>() ?? 0;
+        var reasoning = usage["completion_tokens_details"]?["reasoning_tokens"]?.GetValue<int>() ?? 0;
+        var cached = usage["prompt_tokens_details"]?["cached_tokens"]?.GetValue<int>() ?? 0;
+
+        var visible = completion - reasoning;
+        Console.WriteLine(
+            $"     tokens: in {prompt} ({cached} cached), out {completion} " +
+            $"({reasoning} reasoning + {visible} orders)");
     }
 
     private static ForceOrderSet Parse(string raw, TacticalPicture picture)
@@ -117,6 +140,8 @@ public sealed class OpenRouterClient : IDisposable
 
         // Printed here rather than carried in the contract, so this needed only a sidecar
         // restart to land mid-session.
+        ReportUsage(root);
+
         var assessment = parsed["assessment"]?.GetValue<string>();
         if (!string.IsNullOrWhiteSpace(assessment))
             Console.WriteLine($"     assessment: {assessment}");
