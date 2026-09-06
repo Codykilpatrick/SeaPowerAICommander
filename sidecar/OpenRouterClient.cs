@@ -145,6 +145,7 @@ public sealed class OpenRouterClient : IDisposable
                 TargetContactId = (int)(o["targetContactId"]?.GetValue<double>() ?? 0),
                 Salvo = (int)(o["salvo"]?.GetValue<double>() ?? 1),
                 CoordinationGroup = o["coordinationGroup"]?.GetValue<string>() ?? string.Empty,
+                StrikeType = o["strikeType"]?.GetValue<string>() ?? "Bomb",
                 Reason = o["reason"]?.GetValue<string>() ?? string.Empty,
             });
         }

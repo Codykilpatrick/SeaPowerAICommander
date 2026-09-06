@@ -111,6 +111,9 @@ namespace SeaPowerForceAI.Orders
                 case ForceOrderKind.Disengage:
                     return Disengage(unit);
 
+                case ForceOrderKind.LaunchAirstrike:
+                    return LaunchAirstrike(unit, order);
+
                 default:
                     Plugin.Log.LogWarning($"[orders] unknown kind {order.Kind}");
                     return false;
@@ -224,6 +227,58 @@ namespace SeaPowerForceAI.Orders
             unit.ClearAttackTasks();
             unit.ClearEngageTasks();
             return true;
+        }
+
+        /// <summary>
+        /// Mounts a strike from an airbase or carrier against a detected contact.
+        ///
+        /// Runs the game's own pipeline, so the aircraft get assigned, launched and
+        /// formed up without the commander having to move them individually - which it
+        /// could not do anyway, since parked aircraft ignore movement and speed orders.
+        /// </summary>
+        private static bool LaunchAirstrike(ObjectBase unit, ForceOrder order)
+        {
+            var target = ResolveContact(unit._taskforce, order.TargetContactId);
+            if (target == null)
+            {
+                Plugin.Log.LogWarning(
+                    $"[orders] LaunchAirstrike: contact {order.TargetContactId} not held by this task force");
+                return false;
+            }
+
+            if (unit._ai == null)
+            {
+                Plugin.Log.LogWarning($"[orders] LaunchAirstrike: {unit.getName()} has no AI");
+                return false;
+            }
+
+            // Only something with a flight deck can mount one.
+            if (unit._obp == null || unit._obp._flightDeck == null)
+            {
+                Plugin.Log.LogWarning(
+                    $"[orders] LaunchAirstrike: {unit.getName()} has no flight deck - order an airbase or carrier");
+                return false;
+            }
+
+            var type = ParseStrikeType(order.StrikeType);
+
+            unit._ai.LaunchAirstrike(target, type);
+            Plugin.Log.LogInfo(
+                $"[attack] {unit.getName()} mounting a {type} strike on contact {order.TargetContactId}");
+            return true;
+        }
+
+        private static AirStrike.Type ParseStrikeType(string raw)
+        {
+            if (string.IsNullOrEmpty(raw)) return AirStrike.Type.Bomb;
+
+            switch (raw.Trim().ToLowerInvariant())
+            {
+                case "missile": return AirStrike.Type.Missile;
+                case "sead": return AirStrike.Type.SEAD;
+                case "jam": return AirStrike.Type.Jam;
+                default: return AirStrike.Type.Bomb;
+            }
         }
 
         private static bool SetWeaponStatus(ObjectBase unit, ForceOrder order)

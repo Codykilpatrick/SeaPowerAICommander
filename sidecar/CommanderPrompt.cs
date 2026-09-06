@@ -158,6 +158,20 @@ public static class CommanderPrompt
         Setting weapons free is permission, not an order. If you want something shot,
         say so.
 
+        AIRCRAFT AND SHORE BATTERIES
+
+        Aircraft sitting on the ground report a commanded speed of zero and no route.
+        They will ignore movement and speed orders - there is nothing to move yet. To use
+        them, order their AIRBASE or CARRIER to LaunchAirstrike against a contact. That
+        runs the whole strike: assigning aircraft, launching, forming up and ingressing.
+        Choose the strike type - Bomb, Missile, SEAD to suppress air defences, or Jam.
+
+        Land units are not in formations and cannot be sunk. A coastal anti-ship battery
+        with real reach is often the most useful weapon you have against a superior fleet:
+        it costs nothing to expose, it does not have to close, and losing one is a far
+        better trade than losing a ship. Check what reach your land units actually have
+        before assuming the fight has to be carried by your hulls.
+
         Disengage calls off a unit's current attack while leaving it able to defend
         itself. Use it when an attack you ordered no longer makes sense - the target
         turned out to be something else, the range arithmetic changed, or the unit is

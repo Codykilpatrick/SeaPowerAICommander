@@ -67,6 +67,12 @@ public static class OrderSchema
                     ["type"] = "integer",
                     ["description"] = "AttackTarget and CoordinatedAttack only. How many rounds or missiles to commit. Use 1 for other order kinds.",
                 },
+                ["strikeType"] = new JsonObject
+                {
+                    ["type"] = "string",
+                    ["enum"] = new JsonArray("Bomb", "Missile", "SEAD", "Jam"),
+                    ["description"] = "LaunchAirstrike only. SEAD suppresses air defences, Jam is electronic attack. Use \"Bomb\" for other order kinds.",
+                },
                 ["coordinationGroup"] = new JsonObject
                 {
                     ["type"] = "string",
@@ -82,7 +88,7 @@ public static class OrderSchema
             // "use 0 / use Tight" notes above for fields a given kind ignores.
             ["required"] = new JsonArray(
                 "kind", "unitId", "latitude", "longitude", "speedKnots", "weaponStatus",
-                "targetContactId", "salvo", "coordinationGroup", "reason"),
+                "targetContactId", "salvo", "coordinationGroup", "strikeType", "reason"),
             ["additionalProperties"] = false,
         };
 

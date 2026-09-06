@@ -50,6 +50,22 @@ namespace SeaPowerForceAI.Orders
         /// itself. Being able to start something you cannot stop is a bad action space.
         /// </summary>
         Disengage,
+
+        /// <summary>
+        /// Order an airbase or carrier to mount a strike on a contact.
+        ///
+        /// Aircraft sit on the ground until something launches them, and nothing in the
+        /// action space could. The commander repeatedly identified idle aircraft as wasted
+        /// assets and then tasked them with movement orders they could not obey. This runs
+        /// the game's own strike pipeline instead - assigning aircraft, launching,
+        /// assembling and ingressing - which also sidesteps the formation problem, since
+        /// the strike manages its own package.
+        ///
+        /// Note: the strike will sweep up other vessels near the target from ground truth,
+        /// which is the game's behaviour and the one place this mod's detection-limited
+        /// picture does not hold.
+        /// </summary>
+        LaunchAirstrike,
     }
 
     public static class ForceOrderKinds
@@ -82,6 +98,7 @@ namespace SeaPowerForceAI.Orders
                 case ForceOrderKind.AttackTarget:
                 case ForceOrderKind.CoordinatedAttack:
                 case ForceOrderKind.Disengage:
+                case ForceOrderKind.LaunchAirstrike:
                     return false;
 
                 default:
@@ -120,6 +137,12 @@ namespace SeaPowerForceAI.Orders
         /// together once all its units are ready.
         /// </summary>
         public string CoordinationGroup;
+
+        /// <summary>
+        /// LaunchAirstrike only: "Bomb" | "Missile" | "SEAD" | "Jam".
+        /// SEAD suppresses air defences; Jam is electronic attack.
+        /// </summary>
+        public string StrikeType;
 
         /// <summary>Free text for the log. Useful when a brain should explain itself.</summary>
         public string Reason;
