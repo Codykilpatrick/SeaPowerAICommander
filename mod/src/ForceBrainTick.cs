@@ -308,8 +308,75 @@ namespace SeaPowerForceAI
                 };
             }
 
+            VerifyStandingOrders(picture);
+
             state.LastDecisionTime = now;
             state.Seeded = true;
+        }
+
+        /// <summary>
+        /// Checks what was ordered against what the units are actually doing.
+        ///
+        /// "applied N, rejected 0" only means the call did not throw - it says nothing
+        /// about whether the unit obeyed. A command that silently no-ops for some unit
+        /// type would look identical to one that worked, and the commander would keep
+        /// issuing it forever. This is the only thing that closes the loop.
+        /// </summary>
+        private static void VerifyStandingOrders(TacticalPicture picture)
+        {
+            if (picture.StandingOrders.Count == 0) return;
+
+            var units = new Dictionary<int, OwnUnit>();
+            foreach (var u in picture.OwnUnits) units[u.Id] = u;
+
+            var ignored = 0;
+
+            foreach (var order in picture.StandingOrders)
+            {
+                OwnUnit unit;
+                if (!units.TryGetValue(order.UnitId, out unit)) continue;
+
+                switch (order.Kind)
+                {
+                    case ForceOrderKind.MoveTo:
+                        // A unit told to go somewhere should have a route.
+                        if (unit.WaypointsRemaining == 0)
+                        {
+                            ignored++;
+                            Plugin.Log.LogWarning(
+                                $"[verify] {unit.Name} ({unit.Id}): ordered MoveTo but has no waypoints - order did not take");
+                        }
+                        break;
+
+                    case ForceOrderKind.SetSpeed:
+                        // Compare against the COMMANDED speed, not the actual one - a unit
+                        // still accelerating is obeying, just not there yet.
+                        if (Math.Abs(unit.CommandedSpeedKnots - order.SpeedKnots) > 2f
+                            && order.SpeedKnots <= unit.MaxSpeedKnots)
+                        {
+                            ignored++;
+                            Plugin.Log.LogWarning(
+                                $"[verify] {unit.Name} ({unit.Id}): ordered {order.SpeedKnots:F0}kt " +
+                                $"but commanded speed is {unit.CommandedSpeedKnots:F0}kt - order did not take");
+                        }
+                        break;
+
+                    case ForceOrderKind.SetWeaponStatus:
+                        if (!string.IsNullOrEmpty(unit.WeaponStatus)
+                            && !string.Equals(unit.WeaponStatus, order.WeaponStatus, StringComparison.OrdinalIgnoreCase))
+                        {
+                            ignored++;
+                            Plugin.Log.LogWarning(
+                                $"[verify] {unit.Name} ({unit.Id}): ordered weapons {order.WeaponStatus} " +
+                                $"but posture is {unit.WeaponStatus} - order did not take");
+                        }
+                        break;
+                }
+            }
+
+            Plugin.Log.LogInfo(
+                $"[verify] {picture.TaskforceName}: {picture.StandingOrders.Count} standing, " +
+                $"{ignored} not reflected in unit state");
         }
     }
 }

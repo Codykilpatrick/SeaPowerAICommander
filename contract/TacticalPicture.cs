@@ -139,6 +139,9 @@ namespace SeaPowerForceAI.Picture
         /// <summary>Speed currently commanded. Differs from SpeedKnots while accelerating.</summary>
         public float CommandedSpeedKnots;
 
+        /// <summary>Current weapons posture: Tight / Free / Hold.</summary>
+        public string WeaponStatus;
+
         /// <summary>Waypoints still queued. 0 means the unit is not going anywhere.</summary>
         public int WaypointsRemaining;
 
