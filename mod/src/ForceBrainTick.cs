@@ -339,8 +339,18 @@ namespace SeaPowerForceAI
                 switch (order.Kind)
                 {
                     case ForceOrderKind.MoveTo:
-                        // A unit told to go somewhere should have a route.
-                        if (unit.WaypointsRemaining == 0)
+                        // A formation follower takes its movement from the leader and
+                        // legitimately holds no waypoints of its own, so an empty route is
+                        // not evidence the order failed - though it does mean the order
+                        // probably achieved nothing, which the commander is now told.
+                        if (unit.InFormation && !unit.ActsIndependentlyInFormation)
+                        {
+                            ignored++;
+                            Plugin.Log.LogWarning(
+                                $"[verify] {unit.Name} ({unit.Id}): ordered MoveTo but is a formation follower - " +
+                                "movement comes from its leader, so the order likely had no effect");
+                        }
+                        else if (unit.WaypointsRemaining == 0)
                         {
                             ignored++;
                             Plugin.Log.LogWarning(

@@ -139,6 +139,9 @@ namespace SeaPowerForceAI.Picture
                     MaxSpeedKnots = Finite(obj.MaxForwardSpeedInKnots),
                     SpeedKnots = Finite(obj.getVelocityInKnots()),
                     WeaponStatus = obj._weaponStatus.ToString(),
+                    InFormation = obj.InFormation != null && obj.InFormation.Value,
+                    ActsIndependentlyInFormation =
+                        obj.ActsIndependentlyInFormation != null && obj.ActsIndependentlyInFormation.Value,
                 };
 
                 ApplyCommandedSpeed(unit, obj);

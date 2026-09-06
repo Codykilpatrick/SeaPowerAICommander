@@ -142,6 +142,21 @@ namespace SeaPowerForceAI.Picture
         /// <summary>Current weapons posture: Tight / Free / Hold.</summary>
         public string WeaponStatus;
 
+        /// <summary>
+        /// True when this unit is stationed in a formation.
+        ///
+        /// A formation follower takes its movement from the leader, so a MoveTo aimed at
+        /// it individually may quietly do nothing - the order is accepted and the unit
+        /// keeps following. Move the formation by ordering its leader.
+        /// </summary>
+        public bool InFormation;
+
+        /// <summary>
+        /// True when the unit manoeuvres on its own account despite being in a formation.
+        /// Such a unit does respond to individual movement orders.
+        /// </summary>
+        public bool ActsIndependentlyInFormation;
+
         /// <summary>Waypoints still queued. 0 means the unit is not going anywhere.</summary>
         public int WaypointsRemaining;
 

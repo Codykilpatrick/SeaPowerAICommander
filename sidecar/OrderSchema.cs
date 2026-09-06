@@ -91,6 +91,15 @@ public static class OrderSchema
             ["type"] = "object",
             ["properties"] = new JsonObject
             {
+                // Required even when no orders follow. A cycle that issues nothing
+                // otherwise prints nothing, so a commander deliberately holding looks
+                // identical to one that has stopped working - and the only place that
+                // difference is visible is here.
+                ["assessment"] = new JsonObject
+                {
+                    ["type"] = "string",
+                    ["description"] = "One or two sentences on the situation and what you are doing about it. Required every cycle, ESPECIALLY when you issue no orders - say why nothing needs changing.",
+                },
                 ["orders"] = new JsonObject
                 {
                     ["type"] = "array",
@@ -98,7 +107,7 @@ public static class OrderSchema
                     ["items"] = order,
                 },
             },
-            ["required"] = new JsonArray("orders"),
+            ["required"] = new JsonArray("assessment", "orders"),
             ["additionalProperties"] = false,
         };
     }

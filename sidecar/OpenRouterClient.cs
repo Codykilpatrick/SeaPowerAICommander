@@ -85,6 +85,12 @@ public sealed class OpenRouterClient : IDisposable
             DerivedFromTime = picture.TimeSeconds,
         };
 
+        // Printed here rather than carried in the contract, so this needed only a sidecar
+        // restart to land mid-session.
+        var assessment = parsed["assessment"]?.GetValue<string>();
+        if (!string.IsNullOrWhiteSpace(assessment))
+            Console.WriteLine($"     assessment: {assessment}");
+
         if (parsed["orders"] is not JsonArray array) return set;
 
         foreach (var node in array)

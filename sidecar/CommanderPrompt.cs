@@ -78,6 +78,13 @@ public static class CommanderPrompt
           headed. A unit with waypointsRemaining greater than zero is already under way -
           check where to before redirecting it.
 
+        - inFormation says the unit is stationed in a formation. A formation FOLLOWER takes
+          its movement from the leader: a MoveTo aimed at it individually is accepted and
+          then quietly does nothing, and it will keep reporting no waypoints of its own.
+          To move a formation, order its LEADER - the one whose waypoints are set - or
+          accept that the follower will not go where you sent it.
+          A unit with actsIndependentlyInFormation does respond to individual orders.
+
         Use this to verify rather than assume. If a unit is already moving to roughly the
         right place at a sensible speed, it needs nothing from you. Do not invent problems:
         if the reported state matches your intent, the order is working.
