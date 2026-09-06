@@ -16,6 +16,25 @@ namespace SeaPowerForceAI.Picture
     {
         private const float MetresPerSecondToKnots = 1.943844f;
 
+        /// <summary>
+        /// Replaces NaN and Infinity with 0.
+        ///
+        /// Game physics produces non-finite floats readily - a Mach-based speed command
+        /// reports an infinite knots value, for one. Newtonsoft writes those as bare
+        /// Infinity/NaN tokens, which System.Text.Json rejects outright, so a single bad
+        /// unit takes down the whole decision with a parse error. Every float sourced
+        /// from the game goes through here.
+        /// </summary>
+        private static float Finite(float value)
+        {
+            return (float.IsNaN(value) || float.IsInfinity(value)) ? 0f : value;
+        }
+
+        private static double Finite(double value)
+        {
+            return (double.IsNaN(value) || double.IsInfinity(value)) ? 0.0 : value;
+        }
+
         public static TacticalPicture Build(Taskforce tf)
         {
             var picture = new TacticalPicture
@@ -54,12 +73,12 @@ namespace SeaPowerForceAI.Picture
                     Name = obj.getName(),
                     Category = category,
                     Roles = DescribeRoles(obj),
-                    Latitude = geo != null ? geo.Latitude : 0.0,
-                    Longitude = geo != null ? geo.Longitude : 0.0,
-                    Altitude = geo != null ? geo._height : 0.0,
-                    HeadingDeg = obj.getHeading(),
-                    MaxSpeedKnots = obj.MaxForwardSpeedInKnots,
-                    SpeedKnots = obj.getVelocityInKnots(),
+                    Latitude = geo != null ? Finite(geo.Latitude) : 0.0,
+                    Longitude = geo != null ? Finite(geo.Longitude) : 0.0,
+                    Altitude = geo != null ? Finite(geo._height) : 0.0,
+                    HeadingDeg = Finite(obj.getHeading()),
+                    MaxSpeedKnots = Finite(obj.MaxForwardSpeedInKnots),
+                    SpeedKnots = Finite(obj.getVelocityInKnots()),
                 };
 
                 ApplyCommandedSpeed(unit, obj);
@@ -80,7 +99,11 @@ namespace SeaPowerForceAI.Picture
             {
                 var command = obj.SpeedCommand != null ? obj.SpeedCommand.Value : null;
                 if (command != null)
-                    unit.CommandedSpeedKnots = command.CommandSpeedInKnots;
+                {
+                    // A Mach-based command reports infinite knots - this is the one that
+                    // took down three consecutive decisions.
+                    unit.CommandedSpeedKnots = Finite(command.CommandSpeedInKnots);
+                }
             }
             catch (Exception ex)
             {
@@ -104,8 +127,8 @@ namespace SeaPowerForceAI.Picture
                 var next = waypoints[0];
                 if (next != null && next._geoposition != null)
                 {
-                    unit.NextWaypointLatitude = next._geoposition.Latitude;
-                    unit.NextWaypointLongitude = next._geoposition.Longitude;
+                    unit.NextWaypointLatitude = Finite(next._geoposition.Latitude);
+                    unit.NextWaypointLongitude = Finite(next._geoposition.Longitude);
                 }
             }
             catch (Exception ex)
@@ -156,7 +179,7 @@ namespace SeaPowerForceAI.Picture
                     Dormant = veh.IsDormant != null && veh.IsDormant.Value,
                     Relationship = DescribeRelationship(tf, veh),
                     DetectingSensors = veh.DetectingSensors.ToString(),
-                    FirstDetectedAt = veh.InitialDetectionEpoch,
+                    FirstDetectedAt = Finite(veh.InitialDetectionEpoch),
                 };
 
                 ApplyPosition(contact, veh);
@@ -182,9 +205,9 @@ namespace SeaPowerForceAI.Picture
             var geo = estimate.Value.Item1;
             if (geo == null) return;
 
-            contact.Latitude = geo.Latitude;
-            contact.Longitude = geo.Longitude;
-            contact.Altitude = geo._height;
+            contact.Latitude = Finite(geo.Latitude);
+            contact.Longitude = Finite(geo.Longitude);
+            contact.Altitude = Finite(geo._height);
         }
 
         private static void ApplyVelocity(Contact contact, Vehicle veh)
@@ -195,11 +218,11 @@ namespace SeaPowerForceAI.Picture
             var horizontal = new Vector3(v.x, 0f, v.z);
             if (horizontal.sqrMagnitude <= 0.0001f) return;
 
-            contact.SpeedKnots = horizontal.magnitude * MetresPerSecondToKnots;
+            contact.SpeedKnots = Finite(horizontal.magnitude * MetresPerSecondToKnots);
 
             var course = Mathf.Atan2(horizontal.x, horizontal.z) * Mathf.Rad2Deg;
             if (course < 0f) course += 360f;
-            contact.CourseDeg = course;
+            contact.CourseDeg = Finite(course);
         }
 
         private static string ReadClass(Vehicle veh)

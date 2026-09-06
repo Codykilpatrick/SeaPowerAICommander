@@ -163,5 +163,11 @@ public static class PictureJson
         // default and the sidecar sees an empty task force rather than an error. That
         // failure mode cost a debugging session once; it should not be possible twice.
         PropertyNameCaseInsensitive = true,
+
+        // Accept NaN and Infinity rather than throwing. The mod now sanitises every float
+        // it reads from game physics, but one non-finite value slipping through should
+        // degrade a single field, not abort the whole decision - which is exactly what it
+        // did when a Mach-based speed command reported infinite knots.
+        NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowNamedFloatingPointLiterals,
     };
 }
