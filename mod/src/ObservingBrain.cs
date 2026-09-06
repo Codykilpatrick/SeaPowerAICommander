@@ -42,6 +42,12 @@ namespace SeaPowerForceAI
                 Plugin.Log.LogInfo(JsonConvert.SerializeObject(picture, Formatting.Indented));
         }
 
+        /// <summary>Never busy - observing is synchronous and free.</summary>
+        public bool IsBusy
+        {
+            get { return false; }
+        }
+
         public bool TryTakeOrders(out ForceOrderSet orders)
         {
             orders = null;

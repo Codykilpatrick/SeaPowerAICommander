@@ -24,6 +24,7 @@ namespace SeaPowerForceAI.Picture
                 TaskforceName = string.IsNullOrEmpty(tf._nameInMissionFile) ? "(unnamed)" : tf._nameInMissionFile,
                 Side = tf.Side.ToString(),
                 IsOnAlert = tf._isOnAlert,
+                TimeCompression = GameTime.TimeCompression,
             };
 
             AddOwnUnits(picture, tf._taskforceVessels, "Vessel");
@@ -47,7 +48,7 @@ namespace SeaPowerForceAI.Picture
 
                 var geo = obj._geoPosition;
 
-                picture.OwnUnits.Add(new OwnUnit
+                var unit = new OwnUnit
                 {
                     Id = obj.UniqueID,
                     Name = obj.getName(),
@@ -58,7 +59,58 @@ namespace SeaPowerForceAI.Picture
                     Altitude = geo != null ? geo._height : 0.0,
                     HeadingDeg = obj.getHeading(),
                     MaxSpeedKnots = obj.MaxForwardSpeedInKnots,
-                });
+                    SpeedKnots = obj.getVelocityInKnots(),
+                };
+
+                ApplyCommandedSpeed(unit, obj);
+                ApplyRoute(unit, obj);
+
+                picture.OwnUnits.Add(unit);
+            }
+        }
+
+        /// <summary>
+        /// What speed the unit has been told to make, as opposed to what it is doing.
+        /// The gap between the two is how the commander can tell an order is still being
+        /// carried out rather than complete.
+        /// </summary>
+        private static void ApplyCommandedSpeed(OwnUnit unit, ObjectBase obj)
+        {
+            try
+            {
+                var command = obj.SpeedCommand != null ? obj.SpeedCommand.Value : null;
+                if (command != null)
+                    unit.CommandedSpeedKnots = command.CommandSpeedInKnots;
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.LogWarning($"[picture] speed command unreadable for {unit.Name}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Where the unit is actually headed. Without this the commander cannot tell a
+        /// unit already en route to the right place from one sitting still.
+        /// </summary>
+        private static void ApplyRoute(OwnUnit unit, ObjectBase obj)
+        {
+            try
+            {
+                var waypoints = obj.ExportWaypoints();
+                if (waypoints == null || waypoints.Count == 0) return;
+
+                unit.WaypointsRemaining = waypoints.Count;
+
+                var next = waypoints[0];
+                if (next != null && next._geoposition != null)
+                {
+                    unit.NextWaypointLatitude = next._geoposition.Latitude;
+                    unit.NextWaypointLongitude = next._geoposition.Longitude;
+                }
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.LogWarning($"[picture] waypoints unreadable for {unit.Name}: {ex.Message}");
             }
         }
 

@@ -67,6 +67,32 @@ public static class CommanderPrompt
         where you only ever adjust weapon status is a cycle where you have not really
         commanded anything.
 
+        WHAT YOUR OWN FORCE IS ACTUALLY DOING
+
+        Each of your units reports observed state, not just what you asked for:
+
+        - speedKnots is its ACTUAL speed; commandedSpeedKnots is what it was told to make.
+          A gap between them means it is still accelerating or slowing, not that the order
+          failed.
+        - waypointsRemaining and nextWaypointLatitude/Longitude show where it is actually
+          headed. A unit with waypointsRemaining greater than zero is already under way -
+          check where to before redirecting it.
+
+        Use this to verify rather than assume. If a unit is already moving to roughly the
+        right place at a sensible speed, it needs nothing from you. Do not invent problems:
+        if the reported state matches your intent, the order is working.
+
+        HOW FAST THE CLOCK IS RUNNING
+
+        timeCompression is the game speed multiplier. Your decisions take a fixed amount of
+        real time, so the higher this is, the more game time passes before you are consulted
+        again - at 10x you may not get another say for many minutes of battle, at 1x you
+        will be back shortly.
+
+        When it is high, order durable forward-looking intent that stays sensible without
+        follow-up, and prefer positions with margin over precise ones. When it is low, you
+        can afford smaller corrections and will be able to adjust.
+
         HOW TO THINK
 
         Weigh the things a real commander weighs: the threat axis, whether your high-value
@@ -98,6 +124,7 @@ public static class CommanderPrompt
         var sb = new StringBuilder();
         sb.AppendLine($"Tactical picture at mission time {picture.TimeSeconds:F0}s.");
         sb.AppendLine($"You command \"{picture.TaskforceName}\" (side: {picture.Side}). Alert state: {(picture.IsOnAlert ? "ALERT" : "normal")}.");
+        sb.AppendLine($"Game speed: {picture.TimeCompression:F0}x.");
 
         // Surface continuity in the prose too, not only buried in the JSON - losses and
         // standing orders are the things most likely to be skimmed past.

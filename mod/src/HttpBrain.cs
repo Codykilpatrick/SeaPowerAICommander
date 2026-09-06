@@ -121,6 +121,11 @@ namespace SeaPowerForceAI
             thread.Start();
         }
 
+        public bool IsBusy
+        {
+            get { return _inFlight; }
+        }
+
         public bool TryTakeOrders(out ForceOrderSet orders)
         {
             orders = _ready;

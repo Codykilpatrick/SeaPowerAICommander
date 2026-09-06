@@ -28,5 +28,15 @@ namespace SeaPowerForceAI
         /// Called every tick, so it must be cheap.
         /// </summary>
         bool TryTakeOrders(out ForceOrderSet orders);
+
+        /// <summary>
+        /// True when a submission right now would be dropped.
+        ///
+        /// Lets the caller skip building a picture it cannot use. Assembling one walks
+        /// every unit and every plotting-table entry, and under time compression a single
+        /// decision spans many ticks - the first live run built 200 pictures to produce
+        /// 17 decisions and discarded the rest.
+        /// </summary>
+        bool IsBusy { get; }
     }
 }

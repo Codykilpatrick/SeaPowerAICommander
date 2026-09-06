@@ -129,6 +129,13 @@ namespace SeaPowerForceAI
 
             var now = GameTime.time;
             if (now < state.NextSubmitTime) return;
+
+            // Ask before building. A picture walks every unit and every plotting-table
+            // entry, and a decision spans many ticks under time compression - building one
+            // the brain will only drop is pure waste. Do NOT advance NextSubmitTime here:
+            // this tick did not consume a decision slot, so the next one should not wait.
+            if (state.Brain.IsBusy) return;
+
             state.NextSubmitTime = now + Plugin.TickIntervalSeconds;
 
             var picture = PictureBuilder.Build(tf);

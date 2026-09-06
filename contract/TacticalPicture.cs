@@ -22,6 +22,15 @@ namespace SeaPowerForceAI.Picture
 
         public bool IsOnAlert;
 
+        /// <summary>
+        /// Game speed multiplier (1, 2, 3, 5, 10). This is not cosmetic: a decision takes
+        /// real seconds, so at 10x roughly ten times as much game time passes between
+        /// decisions as at 1x. The commander gets far fewer chances to intervene per
+        /// game-minute and should order accordingly - durable, forward-looking intent
+        /// rather than small corrections it will not be able to follow up.
+        /// </summary>
+        public float TimeCompression = 1f;
+
         public List<OwnUnit> OwnUnits = new List<OwnUnit>();
 
         /// <summary>Detected contacts. A contact is not necessarily identified or classified.</summary>
@@ -74,6 +83,26 @@ namespace SeaPowerForceAI.Picture
     {
         public int Id;
         public string Name;
+
+        // ---- Observed state ----
+        //
+        // Without these the commander can see what it ASKED for but never what is
+        // happening, so it cannot tell whether an order took effect, was overridden by
+        // the tactical AI, or is being ignored. It was observed spending a whole decision
+        // "resolving conflicting speed orders" that probably did not exist.
+
+        /// <summary>Actual speed right now, in knots.</summary>
+        public float SpeedKnots;
+
+        /// <summary>Speed currently commanded. Differs from SpeedKnots while accelerating.</summary>
+        public float CommandedSpeedKnots;
+
+        /// <summary>Waypoints still queued. 0 means the unit is not going anywhere.</summary>
+        public int WaypointsRemaining;
+
+        /// <summary>Where it is headed next, if anywhere.</summary>
+        public double? NextWaypointLatitude;
+        public double? NextWaypointLongitude;
 
         /// <summary>Vessel / Submarine / Aircraft / Helicopter / LandUnit.</summary>
         public string Category;
