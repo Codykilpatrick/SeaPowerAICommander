@@ -78,9 +78,23 @@ namespace SeaPowerForceAI.Orders
                 Queue.Add(p);
             }
 
-            Plugin.Log.LogInfo(
-                $"[attack] group '{group}': {plan.Count} shooter(s) scheduled, " +
-                $"longest flight {longestFlight:F0}s, release spread {longestFlight:F0}s");
+            // A zero here is not a computed schedule - it is the fallback for weapons whose
+            // flight time we could not estimate, which is every coastal missile battery so
+            // far. They all fire at once, which is usually what saturation wants anyway, but
+            // the timing is a coincidence rather than a plan and the log should not pretend
+            // otherwise.
+            if (longestFlight <= 0f)
+            {
+                Plugin.Log.LogInfo(
+                    $"[attack] group '{group}': {plan.Count} shooter(s) firing together - " +
+                    "flight time could not be estimated for these weapons, so arrival is not coordinated");
+            }
+            else
+            {
+                Plugin.Log.LogInfo(
+                    $"[attack] group '{group}': {plan.Count} shooter(s) scheduled, " +
+                    $"longest flight {longestFlight:F0}s, release spread {longestFlight:F0}s");
+            }
 
             return accepted;
         }

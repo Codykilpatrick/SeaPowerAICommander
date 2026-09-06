@@ -141,6 +141,17 @@ namespace SeaPowerForceAI.Picture
         /// forever while looking, from the outside, exactly like one that is on its way.
         /// </summary>
         public List<AirstrikeStatus> Airstrikes = new List<AirstrikeStatus>();
+
+        /// <summary>
+        /// Air strikes ordered this mission, and how many ever got aircraft. A stalled strike
+        /// is dropped from Airstrikes once the game finishes with it, taking the evidence with
+        /// it - so without a running count the commander rediscovers an unusable airbase one
+        /// wasted order at a time, having correctly written it off the cycle before.
+        /// </summary>
+        public int AirstrikesOrdered;
+
+        /// <summary>How many of those ever progressed past assigning aircraft.</summary>
+        public int AirstrikesThatFlew;
     }
 
     public class EnvironmentConditions
@@ -383,5 +394,8 @@ namespace SeaPowerForceAI.Picture
 
         /// <summary>Aircraft actually committed to it.</summary>
         public int AircraftAssigned;
+
+        /// <summary>The game's own id for this strike, so one can be followed between cycles.</summary>
+        public int Id;
     }
 }

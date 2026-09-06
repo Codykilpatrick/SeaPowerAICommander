@@ -64,6 +64,17 @@ namespace SeaPowerForceAI
             public float NextSubmitTime = float.MinValue;
             public IForceBrain Brain;
 
+            /// <summary>
+            /// Air strikes ordered this mission, and the ids of those seen to get aircraft.
+            /// The game drops a strike from its list once finished with it, so a stalled one
+            /// leaves no trace - and the commander, having correctly concluded the airbase was
+            /// unusable, sees an empty list next cycle and tries again.
+            /// </summary>
+            public int AirstrikesOrdered;
+
+            /// <summary>Strike ids seen past AssigningAircraft, so each is counted once.</summary>
+            public readonly HashSet<int> AirstrikesThatFlew = new HashSet<int>();
+
             /// <summary>Units present at the last decision, so losses can be diffed against now.</summary>
             public readonly Dictionary<int, LostUnit> KnownUnits = new Dictionary<int, LostUnit>();
 
@@ -239,6 +250,11 @@ namespace SeaPowerForceAI
 
             var accepted = OrderExecutor.Apply(tf, ready);
 
+            // Counted here rather than where strikes are read, because a strike that never
+            // finds aircraft is pruned by the game and would otherwise go unrecorded.
+            foreach (var order in accepted)
+                if (order.Kind == ForceOrderKind.LaunchAirstrike) state.AirstrikesOrdered++;
+
             // Only orders that took effect become standing. Replaying a rejected order
             // would tell the brain a sunk ship is still under way.
             foreach (var order in accepted)
@@ -333,6 +349,7 @@ namespace SeaPowerForceAI
                 };
             }
 
+            TallyAirstrikes(picture, state);
             LogUnitState(picture);
             VerifyStandingOrders(picture);
 
@@ -404,6 +421,31 @@ namespace SeaPowerForceAI
         /// type would look identical to one that worked, and the commander would keep
         /// issuing it forever. This is the only thing that closes the loop.
         /// </summary>
+        /// <summary>
+        /// Keeps a mission-long count of air strikes ordered against air strikes that ever got
+        /// aircraft, and puts both in the picture.
+        ///
+        /// A strike that cannot find aircraft never leaves AssigningAircraft, and the game
+        /// eventually drops it from the task force's list. The commander then sees no strikes
+        /// at all - not a failed one - and orders another, having reasoned correctly the cycle
+        /// before that the airbase had nothing to give. Six were ordered in one mission that
+        /// way. A running count survives the pruning and makes the pattern visible.
+        /// </summary>
+        private static void TallyAirstrikes(TacticalPicture picture, BrainState state)
+        {
+            foreach (var strike in picture.Airstrikes)
+            {
+                if (strike.AircraftAssigned > 0
+                    || !string.Equals(strike.State, "AssigningAircraft", StringComparison.Ordinal))
+                {
+                    state.AirstrikesThatFlew.Add(strike.Id);
+                }
+            }
+
+            picture.AirstrikesOrdered = state.AirstrikesOrdered;
+            picture.AirstrikesThatFlew = state.AirstrikesThatFlew.Count;
+        }
+
         /// <summary>
         /// Records an order that is not being carried out - to the log for us, and into the
         /// picture for the commander. It had no way to learn that an order failed, so it kept

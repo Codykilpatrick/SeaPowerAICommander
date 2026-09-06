@@ -628,6 +628,7 @@ namespace SeaPowerForceAI.Picture
                         State = strike.StateMachine != null ? strike.StateMachine.CurrentStateName : "Unknown",
                         AircraftAssigned = strike._attackAircraft != null ? strike._attackAircraft.Count : 0,
                         AgeSeconds = 0f,
+                        Id = strike._id,
                     });
                 }
             }

@@ -155,9 +155,50 @@ public static class CommanderPrompt
         - Later states (Launch, AssembleAndDepart, Transition, BombingRun, MissileAttack, SEAD)
           mean aircraft are committed and it is genuinely under way.
 
+        airstrikesOrdered and airstrikesThatFlew count the whole mission. A stalled strike is
+        eventually dropped from the list above, so an empty list does not mean the airbase
+        works - check the counts. If you have ordered several and none has ever flown, the
+        airbase cannot mount strikes in this scenario. Stop ordering them and fight with what
+        you have.
+
         Never assume an ordered strike is doing anything. Read its state. If your air strikes
         are stalled, you have no air campaign, whatever you ordered - plan with the forces that
         are actually able to fight.
+
+        READING WHETHER YOUR ATTACKS ARE WORKING
+
+        You are told when a contact is destroyed. You are never told that one was damaged,
+        because you could not know it - there is no report from a ship you shot at.
+
+        What you do get is what your sensors see, and a hit changes what a ship does. Compare
+        a contact against its earlier behaviour:
+
+        - Speed falling sharply, and staying down, suggests damage. So does a sudden turn away
+          from its previous course.
+        - detectingSensors shrinking - a contact you held on radar and ESM that you now hold
+          only visually - suggests it has stopped radiating, from damage or from choice.
+        - A contact going dormant, or dropping out of the picture entirely, may be sinking,
+          may be hiding, may simply have moved beyond your reach.
+
+        Treat all of this as evidence, never proof. A slowed ship may be a damaged ship or a
+        ship that chose to slow. Say which you think it is and why, and do not spend your
+        remaining ordnance on a target you merely hope is hurt.
+
+        This matters most when your objective is to impose cost rather than to sink. Forcing an
+        escort to burn its interceptors is a real result, and the only sign of it you will ever
+        get is a change in what that escort does.
+
+        ATTACKING SOMETHING THAT IS ESCORTED
+
+        A target's own reach is not the reach you have to survive. An unarmed tanker reports
+        antiSurfaceRangeNM 0 and can do nothing to you - but if it is sailing behind warships,
+        the range that decides whether your strike lives is theirs, not the tanker's.
+
+        Before sending a unit at a soft target, ask what lies between the two. If reaching it
+        means crossing an escort's envelope, then that escort's reach is the number that
+        applies, and "the tanker cannot shoot back" is not a reason to close.
+
+        Strike the escorted target from outside the screen, or not at all.
 
         REACH AND THREAT ENVELOPES - CHECK BEFORE YOU COMMIT
 
