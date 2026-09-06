@@ -166,8 +166,10 @@ public sealed class OpenRouterClient : IDisposable
         if (string.IsNullOrWhiteSpace(message))
             throw new InvalidOperationException($"No message content in response: {Truncate(raw, 400)}");
 
-        var parsed = JsonNode.Parse(message) as JsonObject
-                     ?? throw new InvalidOperationException("Model content was not a JSON object.");
+        // The schema is sent strict, but the model still answers in prose occasionally -
+        // four times in one evening, each killing the whole decision. When it does, the
+        // words it chose instead are the only evidence of why.
+        var parsed = ParseBody(message, "Model content");
 
         var set = new ForceOrderSet
         {
