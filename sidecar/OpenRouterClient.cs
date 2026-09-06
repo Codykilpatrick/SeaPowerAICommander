@@ -22,14 +22,21 @@ public sealed class OpenRouterClient : IDisposable
     private readonly string _model;
 
     /// <summary>
-    /// Ceiling on reasoning tokens per decision. Left unbounded, reasoning grows with how
-    /// hard the tactical situation is - measured at ~700 tokens with nothing in contact and
-    /// an extrapolated ~7,500 in a six-contact engagement, which is where decisions began
-    /// arriving after the game had stopped listening. A commander that answers late has not
-    /// answered. Tune with FORCEAI_REASONING_TOKENS; 0 removes the ceiling.
+    /// How hard the model may think before answering. Reasoning is essentially the whole
+    /// cost of a decision - measured at 85-90% of output tokens at every difficulty, and
+    /// 6,755 of 7,382 on the cycle that took 93.9s - so this is the only lever that moves
+    /// latency without touching what the commander is told or which model reads it.
+    ///
+    /// It must be an effort level, not a token budget. Sonnet 5 reasons adaptively and
+    /// rejects Anthropic's budget_tokens outright, so OpenRouter quietly drops a
+    /// reasoning.max_tokens rather than send a request that would fail - which is why an
+    /// earlier 2048-token ceiling changed nothing at all and went unnoticed while decisions
+    /// still came back at 4,353 and 6,755 reasoning tokens.
+    ///
+    /// Tune with FORCEAI_REASONING_EFFORT (high, medium, low); "none" removes the setting.
     /// </summary>
-    private readonly int _reasoningMaxTokens =
-        int.TryParse(Environment.GetEnvironmentVariable("FORCEAI_REASONING_TOKENS"), out var r) ? r : 2048;
+    private readonly string _reasoningEffort =
+        Environment.GetEnvironmentVariable("FORCEAI_REASONING_EFFORT") ?? "low";
 
     public OpenRouterClient(string apiKey, string model, TimeSpan timeout)
     {
@@ -95,8 +102,8 @@ public sealed class OpenRouterClient : IDisposable
             },
         };
 
-        if (_reasoningMaxTokens > 0)
-            body["reasoning"] = new JsonObject { ["max_tokens"] = _reasoningMaxTokens };
+        if (!string.Equals(_reasoningEffort, "none", StringComparison.OrdinalIgnoreCase))
+            body["reasoning"] = new JsonObject { ["effort"] = _reasoningEffort };
 
         using var content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
         using var response = await _http.PostAsync(Endpoint, content, ct).ConfigureAwait(false);
