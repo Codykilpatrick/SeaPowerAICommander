@@ -132,6 +132,7 @@ namespace SeaPowerForceAI.Picture
             if (string.IsNullOrEmpty(path) || !System.IO.File.Exists(path)) return;
 
             var inEnglish = false;
+            var inDescription = false;
             var description = new System.Text.StringBuilder();
 
             foreach (var raw in System.IO.File.ReadLines(path, System.Text.Encoding.UTF8))
@@ -151,6 +152,21 @@ namespace SeaPowerForceAI.Picture
                 if (line.StartsWith("Description=", StringComparison.OrdinalIgnoreCase))
                 {
                     description.Append(line.Substring("Description=".Length));
+                    inDescription = true;
+                    continue;
+                }
+
+                // A description runs across several paragraphs separated by blank lines,
+                // so it does not end until the next key. Reading only the first line
+                // truncated Hormuz to a quarter of its briefing.
+                if (inDescription)
+                {
+                    var isNextKey = line.Length > 0
+                        && line.IndexOf('=') > 0
+                        && !line.StartsWith(" ");
+
+                    if (isNextKey) inDescription = false;
+                    else { if (line.Length > 0) description.Append(' ').Append(line); continue; }
                 }
                 else if (line.IndexOf("StartMessage=", StringComparison.OrdinalIgnoreCase) > 0)
                 {
