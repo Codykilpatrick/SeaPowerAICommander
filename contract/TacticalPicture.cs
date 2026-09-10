@@ -335,16 +335,36 @@ namespace SeaPowerAICommander.Picture
         /// </summary>
         public string Domain;
 
-        /// <summary>True once the unit's identity is established, not merely detected.</summary>
+        /// <summary>
+        /// WHAT it is: the class is known, so the threat envelope below is meaningful.
+        /// Mirrors the game's <c>Vehicle.Identified</c>, which is set from
+        /// <c>Class.HasValue</c>.
+        /// </summary>
         public bool Identified;
 
-        /// <summary>True once the contact has a type (surface/air/subsurface), short of full ID.</summary>
+        /// <summary>
+        /// WHOSE it is: the side has been established, so <see cref="Relationship"/> is
+        /// meaningful.
+        ///
+        /// This is the game's <c>Vehicle.IsClassified</c>, which is literally
+        /// <c>UnitTaskforce.Value != null</c> - a SIDE, not a domain. This used to be
+        /// documented as "the contact has a type (surface/air/subsurface)", which is
+        /// <see cref="Identified"/>'s job and led to the two being treated as one thing.
+        ///
+        /// Classified without identified is the ordinary state of a hostile you have found
+        /// but not yet inspected, and it is enough to shoot: the commander prompt leans on
+        /// this distinction, so keep the two apart.
+        /// </summary>
         public bool Classified;
 
         /// <summary>Contact is held but currently stale - no recent sensor update.</summary>
         public bool Dormant;
 
-        /// <summary>Hostile / Friendly / Neutral / Unknown, from the reported side.</summary>
+        /// <summary>
+        /// Hostile / Friendly / Neutral / Unknown, answered by the game's own
+        /// <c>Vehicle.CurrentRelationship()</c> rather than re-derived - see
+        /// PictureBuilder.DescribeRelationship for why that distinction cost a battle.
+        /// </summary>
         public string Relationship;
 
         /// <summary>Estimated position. Null when the contact is bearing-only.</summary>

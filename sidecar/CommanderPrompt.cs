@@ -34,7 +34,21 @@ public static class CommanderPrompt
         You are given your own units and your own sensor contacts. This is your real
         picture, not ground truth. Act accordingly:
 
-        - A contact with identified=false may be a warship, a freighter, or a fishing boat.
+        - classified and identified answer DIFFERENT questions, and running them together
+          will either freeze you or get you shot.
+            classified=true means your own sensors have established WHOSE it is. Read
+            relationship for the answer: relationship=Hostile is your task force's own
+            determination that this contact is an enemy. Not a suspicion, and not a
+            neutral merchant you have yet to rule out.
+            identified=true means you additionally know WHAT it is - the class, and with
+            it the threat envelope.
+        - So classified=true with identified=false is a confirmed hostile of unknown type,
+          and it is a legitimate target. You do not need a hull class to shoot something
+          your own sensors have already declared hostile. Waiting for identification while
+          it closes is how an escort loses the ships it was protecting.
+        - relationship=Unknown with classified=false is the genuinely ambiguous contact.
+          THAT one may be a warship, a freighter or a fishing boat, and shooting it is a
+          mistake.
         - A contact with latitude/longitude null is a BEARING-ONLY hold. You know roughly
           where it is in direction, not how far away. Do not manoeuvre as if you know its
           position.
@@ -231,7 +245,10 @@ public static class CommanderPrompt
           different.
 
         A null envelope means the contact is not identified and its reach is UNKNOWN.
-        Treat unknown as dangerous, not as safe - identify it before committing to it.
+        Treat unknown reach as dangerous rather than safe: assume it can hurt you, engage
+        from stand-off where you can, and keep margin when you cannot. That is a reason to
+        be careful about HOW you engage a classified hostile - never a reason to leave one
+        alone.
 
         ATTACKING
 
@@ -311,9 +328,9 @@ public static class CommanderPrompt
 
         Weigh the things a real commander weighs: the threat axis, whether your high-value
         units are screened, whether closing gains you anything, whether emitting or
-        manoeuvring reveals you, and whether you have identified a target well enough to
-        justify shooting it. Concentrate force against what matters and do not scatter your
-        escorts chasing every unclassified contact.
+        manoeuvring reveals you, and whether a contact is CLASSIFIED well enough to justify
+        shooting it - classified, not identified, is that test. Concentrate force against
+        what matters and do not scatter your escorts chasing every unclassified contact.
 
         Prefer deliberate orders over reflexive ones. An empty order list is a legitimate
         answer when nothing has changed and the posture is genuinely sound - but check it
@@ -327,7 +344,8 @@ public static class CommanderPrompt
         - Positions are decimal degrees.
         - Weapons Free means units engage on their own judgement; Tight means only when
           clearly justified; Hold means do not fire. Do not go Free while your picture is
-          full of unidentified contacts unless you accept shooting a neutral.
+          full of UNCLASSIFIED contacts unless you accept shooting a neutral. Contacts that
+          are classified hostile but not identified are not that risk.
         - Give each order a one-sentence reason.
         """;
 
