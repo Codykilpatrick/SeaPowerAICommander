@@ -66,14 +66,28 @@ A commander with no objective optimises for survival, and withdrawal is always t
 answer to that — which is exactly what one does, every cycle, however good its tactical
 reasoning. An objective is what makes risk worth taking.
 
-The mission's own objectives are authored for the player, so they cannot simply be handed
-over. `ObjectiveDeriver` reads the neutral mission description and the *opposing* side's
-briefing once, infers what this side's orders would plausibly have been, and caches the
-result per mission — a commander whose mission changed between cycles would be incoherent.
+`ObjectiveDeriver` handles two cases, and `BriefingIsOwnSide` on the picture is what tells
+them apart. Both results are cached per mission and side — a commander whose mission
+changed between cycles would be incoherent.
 
-The derived objective is a posture, never mirrored down to specifics like unit names or
-positions this side would have no way to know. Set `Brain.ForceObjective` in the mod config
-to skip derivation and state it yourself.
+**Driving the enemy.** The mission's objectives are authored for the player, so they
+cannot be handed over. It reads the neutral mission description and the opposing
+briefing once, infers what this side's orders would plausibly have been, and produces a
+*posture* — never mirrored down to specifics like unit names or positions this side has no
+way to know.
+
+**Driving the player's own delegated fleet.** Those same briefings *are* this force's
+orders, so a second prompt restates them instead of planning against them. Every rule in
+the derivation prompt exists to stop the model adopting what it reads, and here adopting it
+is the whole job, which is why it is a separate prompt rather than a flag.
+
+Getting that distinction wrong is not a subtle degradation. Before `BriefingIsOwnSide`
+existed, delegating your fleet fed the commander its real orders labelled as the enemy's
+and asked it to plan against them — so it pursued roughly the opposite of its mission, and
+looked like it was reasoning badly rather than being told the wrong thing.
+
+Set `Brain.ForceObjective` in the mod config to skip all of this and state the objective
+yourself.
 
 ## Logging
 

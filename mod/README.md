@@ -45,7 +45,36 @@ TaskForceAI.OnUpdate  (Harmony postfix, throttled)
 | `src/IForceBrain.cs` | the brain interface |
 | `src/ObservingBrain.cs` | default — logs, orders nothing |
 | `src/HttpBrain.cs` | POSTs the picture to the sidecar |
+| `src/UI/DelegationMenu.cs` | the right-click entry that hands your fleet over |
 | `src/AnchorChainEntry.cs` | Anchor Chain mod-loader entry point |
+
+## Delegating your own fleet
+
+Right-click any of your own units or formations and pick **Hand fleet to AI Commander**.
+The commander then runs your task force exactly as it runs the enemy's. The same entry
+becomes **Take fleet back**.
+
+It is the whole task force, not a selection of units, and that is not a shortcut: the
+commander builds one picture and takes one decision per force, so there is no cheaper unit
+of hand-over, and a per-unit version would cost the same per cycle while being much harder
+to reason about.
+
+Three things to expect:
+
+- **It will overrule you.** Orders are re-asserted every cycle on the units the commander
+  chose to command. Units it did not order that cycle are left alone, so you are not
+  locked out — but do not expect a waypoint you set to survive on a ship it is steering.
+- **It doubles the spend.** One decision per task force per cycle, so your fleet costs the
+  same as the enemy's. `MinRequestGapMs` still caps the rate.
+- **It feels far more assertive under time compression.** A 60 game-second tick fires
+  every 6 real seconds at 10×.
+
+The menu writes `DrivePlayerTaskforce`, so the choice persists — which matters, because
+Sea Power needs a full restart to reload a code mod but not to change this.
+
+With `Brain.Type = Observing` the entry says *observing only*: the brain logs what it sees
+and orders nothing. That is still a useful thing to turn on — it shows you the picture the
+commander would have had of your own force.
 
 ## The brain interface is async on purpose
 
@@ -78,7 +107,7 @@ clocks, because the two kinds of order spoil at different rates. See
 |---|---|---|---|
 | General | `Enabled` | `true` | Master switch. The patch stays applied; the tick does nothing. |
 | General | `TickIntervalSeconds` | `60` | Game-seconds between decisions. |
-| General | `DrivePlayerTaskforce` | `false` | Also run the brain on your own fleet. Testing only. |
+| General | `DrivePlayerTaskforce` | `false` | Hand your own fleet to the commander. Toggleable in-game — see below. |
 | Brain | `Type` | `Observing` | `Observing` or `Sidecar`. |
 | Brain | `SidecarEndpoint` | `http://127.0.0.1:8787/` | Loopback only — do not point off-machine. |
 | Brain | `SidecarTimeoutMs` | `150000` | Per-cycle ceiling. Background thread, never stalls the game. |

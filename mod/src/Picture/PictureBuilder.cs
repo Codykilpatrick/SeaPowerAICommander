@@ -53,7 +53,7 @@ namespace SeaPowerAICommander.Picture
             AddOwnUnits(picture, tf._taskforceHelicopters, "Helicopter");
             AddOwnUnits(picture, tf._taskforceLandUnits, "LandUnit");
 
-            ApplyMission(picture);
+            ApplyMission(picture, tf);
             ApplyConditions(picture);
             AddContacts(picture, tf);
 
@@ -61,15 +61,18 @@ namespace SeaPowerAICommander.Picture
         }
 
         /// <summary>
-        /// Mission identity, and the opposing side's stated objectives.
+        /// Mission identity, and whatever briefings the mission carries.
         ///
-        /// The objectives in MissionManager are authored for the player. They are carried
-        /// here only so an objective can be inferred for this force when none was
-        /// configured - the scenario author designed both sides, so the opposing briefing
-        /// is the best evidence of what the situation actually is. It is never given to
-        /// the commander as intelligence.
+        /// Whose briefings those are depends on who we are commanding, and that is the
+        /// whole subtlety. MissionManager's objectives and the player-facing opening
+        /// messages are authored FOR THE PLAYER. Driving the enemy, they are the opposing
+        /// plan - evidence to infer a posture against, never intelligence to hand over.
+        /// Driving the player's own delegated force, they are simply its orders.
+        ///
+        /// <see cref="TacticalPicture.BriefingIsOwnSide"/> carries that distinction to the
+        /// sidecar, which cannot work it out for itself.
         /// </summary>
-        private static void ApplyMission(TacticalPicture picture)
+        private static void ApplyMission(TacticalPicture picture, Taskforce tf)
         {
             try
             {
@@ -77,6 +80,10 @@ namespace SeaPowerAICommander.Picture
                 picture.MissionName = string.IsNullOrEmpty(path)
                     ? "(unknown)"
                     : System.IO.Path.GetFileNameWithoutExtension(path);
+
+                // The mission was written for the player's side, so when that is the force
+                // we are commanding, every briefing below is its own orders.
+                picture.BriefingIsOwnSide = tf.Side == Taskforce.TfType.Player;
 
                 // Runtime objectives first, when a mission populates them.
                 var mm = Singleton<MissionManager>.Instance;
@@ -88,7 +95,7 @@ namespace SeaPowerAICommander.Picture
                         if (string.IsNullOrWhiteSpace(objective.Text)) continue;
                         if (objective._isCanceled) continue;
 
-                        picture.OpposingObjectives.Add(objective.Text);
+                        picture.MissionBriefings.Add(objective.Text);
                     }
                 }
 
@@ -99,7 +106,7 @@ namespace SeaPowerAICommander.Picture
                 // one's plan.
                 ReadMissionFile(picture, path);
 
-                if (string.IsNullOrWhiteSpace(picture.MissionDescription) && picture.OpposingObjectives.Count == 0)
+                if (string.IsNullOrWhiteSpace(picture.MissionDescription) && picture.MissionBriefings.Count == 0)
                 {
                     Plugin.Log.LogWarning(
                         $"[mission] {picture.MissionName}: nothing readable in the mission file or " +
@@ -109,7 +116,8 @@ namespace SeaPowerAICommander.Picture
                 {
                     Plugin.Log.LogInfo(
                         $"[mission] {picture.MissionName}: description {picture.MissionDescription?.Length ?? 0} chars, " +
-                        $"{picture.OpposingObjectives.Count} opposing objective(s)");
+                        $"{picture.MissionBriefings.Count} briefing(s), " +
+                        $"{(picture.BriefingIsOwnSide ? "written for THIS force" : "written for the other side")}");
                 }
             }
             catch (Exception ex)
@@ -184,7 +192,7 @@ namespace SeaPowerAICommander.Picture
                     if (pipe >= 0) value = value.Substring(pipe + 1);
 
                     if (!string.IsNullOrWhiteSpace(value))
-                        picture.OpposingObjectives.Add(value.Trim());
+                        picture.MissionBriefings.Add(value.Trim());
                 }
             }
 

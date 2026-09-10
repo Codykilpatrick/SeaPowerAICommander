@@ -68,6 +68,30 @@ namespace SeaPowerAICommander
         internal static float TickIntervalSeconds => _cfgTickInterval != null ? _cfgTickInterval.Value : 60f;
         internal static bool DrivePlayerTaskforce => _cfgDrivePlayerTaskforce != null && _cfgDrivePlayerTaskforce.Value;
 
+        /// <summary>Which brain the tick will build. Read by the delegation menu so it can
+        /// say plainly that handing the fleet to an observing brain changes nothing.</summary>
+        internal static BrainType Brain => _cfgBrain != null ? _cfgBrain.Value : BrainType.Observing;
+
+        /// <summary>
+        /// Hand the player's fleet to the commander, or take it back, while the game runs.
+        ///
+        /// Safe to flip mid-mission: <see cref="DrivePlayerTaskforce"/> is read fresh every
+        /// tick and the tick is the only thing that consults it, so the change lands on the
+        /// next decision with no other plumbing. Writing the ConfigEntry persists it too,
+        /// which is what makes the choice survive the full restart Sea Power needs to
+        /// reload a code mod.
+        /// </summary>
+        internal static void SetDrivePlayerTaskforce(bool on)
+        {
+            if (_cfgDrivePlayerTaskforce == null) return;
+            if (_cfgDrivePlayerTaskforce.Value == on) return;
+
+            _cfgDrivePlayerTaskforce.Value = on;
+            Log.LogInfo(on
+                ? "[delegation] Player task force handed to the AI Commander."
+                : "[delegation] Player task force taken back - the commander will issue it no further orders.");
+        }
+
         public static void Boot()
         {
             if (_booted) return;
@@ -112,8 +136,12 @@ namespace SeaPowerAICommander
                     new AcceptableValueRange<float>(1f, 600f)));
 
             _cfgDrivePlayerTaskforce = _config.Bind("General", "DrivePlayerTaskforce", false,
-                "Also run the brain on the player's own task force. Off by default - useful only " +
-                "for testing what the brain would do with your fleet.");
+                "Hand your own task force to the commander, so it runs your fleet exactly as it " +
+                "runs the enemy's. Off by default. Can also be toggled in-game by right-clicking " +
+                "any of your units, and the menu is the easier way - this setting is what that " +
+                "writes. Delegating costs one decision per cycle for your force on top of the " +
+                "enemy's, and the commander re-asserts its orders every cycle on the units it " +
+                "chose to command, so expect it to overrule you on those.");
 
             _cfgLogUnitState = _config.Bind("Debug", "LogUnitState", true,
                 "One readable line per own unit and per contact each decision: formation " +

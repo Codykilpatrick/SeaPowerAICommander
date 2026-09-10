@@ -12,11 +12,20 @@ namespace SeaPowerAICommander.Sidecar;
 /// right answer to that - which is exactly what one does, every cycle, however good its
 /// tactical reasoning. An objective is what makes risk worth taking.
 ///
-/// The mission's own objectives are authored for the player, so they cannot simply be
-/// handed over. Instead they are read once per mission to infer what THIS side's orders
-/// would plausibly have been, since the scenario author designed both sides and the
-/// opposing briefing is the best evidence of the situation. The result is cached: a
-/// commander whose mission changed between cycles would be incoherent.
+/// There are two cases, and conflating them is worse than having no objective at all.
+///
+/// Driving the ENEMY, the mission's objectives are the player's and cannot be handed
+/// over. They are read once to infer what this side's orders would plausibly have been -
+/// the scenario author designed both sides, so the opposing briefing is the best evidence
+/// of the situation - and never mirrored down to specifics.
+///
+/// Driving the PLAYER's own delegated force, those same objectives ARE this force's
+/// orders. They are adopted, not inferred against. Running the enemy path here produced
+/// an objective opposed to the player's actual mission, which reads as bad tactical
+/// judgement rather than the plumbing fault it is.
+///
+/// Either result is cached: a commander whose mission changed between cycles would be
+/// incoherent.
 /// </summary>
 public static class ObjectiveDeriver
 {
@@ -42,6 +51,32 @@ public static class ObjectiveDeriver
         """;
 
     /// <summary>
+    /// Own-side framing: the briefings ARE this force's orders, so they are restated
+    /// rather than planned against.
+    ///
+    /// A separate prompt rather than a flag inside the other one. Every rule in
+    /// <see cref="DerivationSystem"/> exists to stop the model adopting what it reads,
+    /// and here adopting it is the entire job - so there is nothing shared to factor out.
+    /// </summary>
+    private const string RestatementSystem = """
+        You are reading a naval wargame briefing written for the force you are about to
+        command. These are its own orders.
+
+        Restate them as a standing objective: two or three sentences, second person,
+        addressed to that commander. State what the force is to achieve and what risk is
+        worth taking for it.
+
+        Rules:
+        - ADOPT the briefing. Do not invert it, and do not plan against it - it is yours.
+        - Keep it a standing objective, not a running commentary. Drop anything that was
+          only true at the start, such as opening positions or a first waypoint.
+        - Say plainly what the force is FOR. A commander with only "survive" will withdraw
+          and achieve nothing.
+        - Where the briefing states a constraint - rules of engagement, a place to hold, a
+          thing not to lose - keep it. Those are the orders too.
+        """;
+
+    /// <summary>
     /// Returns the objective for this picture's force, deriving and caching it on first
     /// sight of a mission. A configured objective always wins.
     /// </summary>
@@ -59,8 +94,10 @@ public static class ObjectiveDeriver
             return cached;
 
         var hasDescription = !string.IsNullOrWhiteSpace(picture.MissionDescription);
-        if (!hasDescription && picture.OpposingObjectives.Count == 0)
+        if (!hasDescription && picture.MissionBriefings.Count == 0)
             return string.Empty;
+
+        var ownSide = picture.BriefingIsOwnSide;
 
         var sb = new StringBuilder();
         sb.AppendLine($"Scenario: {picture.MissionName}");
@@ -75,23 +112,28 @@ public static class ObjectiveDeriver
             sb.AppendLine();
         }
 
-        if (picture.OpposingObjectives.Count > 0)
+        if (picture.MissionBriefings.Count > 0)
         {
-            sb.AppendLine("The other side's orders read:");
-            foreach (var o in picture.OpposingObjectives)
+            sb.AppendLine(ownSide
+                ? "Your orders read:"
+                : "The other side's orders read:");
+            foreach (var o in picture.MissionBriefings)
                 sb.AppendLine($"  - {o}");
         }
 
         try
         {
-            var derived = await ask(DerivationSystem, sb.ToString(), ct).ConfigureAwait(false);
+            var system = ownSide ? RestatementSystem : DerivationSystem;
+            var derived = await ask(system, sb.ToString(), ct).ConfigureAwait(false);
             if (string.IsNullOrWhiteSpace(derived)) return string.Empty;
 
             derived = derived.Trim();
             Cache[key] = derived;
 
             Console.WriteLine();
-            Console.WriteLine($"=== Derived objective for {picture.MissionName} ({picture.Side}) ===");
+            Console.WriteLine(ownSide
+                ? $"=== Restated objective for {picture.MissionName} ({picture.Side}, own briefing) ==="
+                : $"=== Derived objective for {picture.MissionName} ({picture.Side}) ===");
             Console.WriteLine(derived);
             Console.WriteLine();
 

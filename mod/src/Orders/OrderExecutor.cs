@@ -166,7 +166,7 @@ namespace SeaPowerAICommander.Orders
             unit.RemoveWaypoints();
             unit.setWaypointTask(
                 new GeoPosition(order.Latitude, order.Longitude),
-                "force-ai",
+                "ai-commander",
                 WaypointData.WaypointHeightState.NoChange);
             return true;
         }

@@ -74,14 +74,26 @@ never in the object it receives. Keep it that way: the moment something here is 
 from a global object list, the guarantee is gone and no amount of prompt instruction gets it
 back.
 
-The two fields that need care:
+The fields that need care:
 
-- **`Objective`** — deliberately not the game's `MissionManager.Objectives`. Those are
-  authored from the player's side; handing them to the opposing commander would be both
-  wrong and a form of cheating. See `ObjectiveDeriver` in the sidecar for how one is
-  inferred instead.
-- **`OpposingObjectives`** — present *only* so an objective can be derived when none was
-  configured. Used once, to infer a posture. Never handed to the commander as intelligence.
+- **`Objective`** — deliberately not the game's `MissionManager.Objectives` when the
+  commander is driving the enemy. Those are authored from the player's side; handing them
+  to the opposing commander would be both wrong and a form of cheating. See
+  `ObjectiveDeriver` in the sidecar for how one is inferred instead.
+- **`MissionBriefings`** — every briefing the mission carries, **unattributed**. The
+  mission file numbers its opening messages by task force (`Taskforce1StartMessage=`) but
+  nothing in the header maps a number onto the force being commanded, so this is honestly
+  just "the briefings this mission contains".
+- **`BriefingIsOwnSide`** — the field that says whose those briefings are, and the one
+  that must never be got wrong. `false` (driving the enemy): the briefings are the
+  opposing plan, used once to infer a posture, never handed over as intelligence. `true`
+  (the player's own fleet delegated to the commander): they *are* this force's orders and
+  are adopted.
+
+  Get that backwards and the delegated fleet pursues the opposite of its mission, which
+  reads as bad tactical judgement rather than the plumbing fault it is. That was a real
+  bug: `MissionBriefings` used to be called `OpposingObjectives`, which was true only
+  while the commander exclusively drove the enemy.
 
 ## Adding an order kind
 

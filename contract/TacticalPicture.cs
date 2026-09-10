@@ -49,15 +49,37 @@ namespace SeaPowerAICommander.Picture
         public string MissionDescription;
 
         /// <summary>
-        /// The OPPOSING side's stated objectives, as written in the mission.
+        /// Every briefing the mission carries - runtime objectives plus the task forces'
+        /// opening messages.
         ///
-        /// Present so an objective can be derived for this force when none was configured:
-        /// the scenario author designed both sides, and the opposing briefing is the best
-        /// available evidence of what the situation is. Used once, to infer a posture -
-        /// never handed to the commander as intelligence, and never mirrored down to
-        /// specifics like unit names or positions this side would have no way to know.
+        /// NOT attributed to a side, and now named for what it actually holds. The mission
+        /// file numbers its opening messages by task force (<c>Taskforce1StartMessage=</c>)
+        /// but nothing in the header maps a number onto the force being commanded, so all
+        /// this can honestly claim is "the briefings this mission contains".
+        ///
+        /// <see cref="BriefingIsOwnSide"/> is what says whether they were written FOR the
+        /// force being commanded, and that decides whether they are adopted or inferred
+        /// against. This was called OpposingObjectives, which held only while the
+        /// commander exclusively drove the enemy.
         /// </summary>
-        public List<string> OpposingObjectives = new List<string>();
+        public List<string> MissionBriefings = new List<string>();
+
+        /// <summary>
+        /// True when the force being commanded is the one the mission was written for -
+        /// the player's own task force, handed over to the commander.
+        ///
+        /// This flips the objective logic end for end, which is why it travels with the
+        /// picture. A briefing written for the OTHER side is evidence to infer a posture
+        /// against, and its specifics are intelligence this force has not earned. A
+        /// briefing written for THIS side is simply its orders, and must be adopted
+        /// rather than mirrored.
+        ///
+        /// Without this a delegated fleet pursued roughly the opposite of its mission:
+        /// the game's objectives are authored for the player, so pointing the commander
+        /// at the player's own force fed it its real orders labelled as the enemy's and
+        /// asked it to plan against them.
+        /// </summary>
+        public bool BriefingIsOwnSide;
 
         /// <summary>
         /// Game speed multiplier (1, 2, 3, 5, 10). This is not cosmetic: a decision takes
