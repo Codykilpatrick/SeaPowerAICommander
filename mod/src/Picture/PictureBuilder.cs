@@ -553,7 +553,7 @@ namespace SeaPowerAICommander.Picture
                     Identified = veh.Identified != null && veh.Identified.Value,
                     Classified = veh.IsClassified,
                     Dormant = veh.IsDormant != null && veh.IsDormant.Value,
-                    Relationship = DescribeRelationship(tf, veh),
+                    Relationship = DescribeRelationship(veh),
                     DetectingSensors = veh.DetectingSensors.ToString(),
                     FirstDetectedAt = Finite(veh.InitialDetectionEpoch),
                 };
@@ -729,17 +729,37 @@ namespace SeaPowerAICommander.Picture
             return string.IsNullOrEmpty(value) ? "Unknown" : value;
         }
 
-        private static string DescribeRelationship(Taskforce tf, Vehicle veh)
+        /// <summary>
+        /// Whose side a contact is on, answered by the GAME rather than re-derived.
+        ///
+        /// This used to compute the relationship from <c>Vehicle.Side</c>, and that is not
+        /// the property the rest of the game classifies from. <c>Vehicle.IsClassified</c>
+        /// is literally <c>UnitTaskforce.Value != null</c>, the track colour on the
+        /// player's screen follows the same field, and <c>Vehicle.CurrentRelationship()</c>
+        /// reads <c>UnitTaskforce</c> too. <c>Side</c> is a live SourcedProperty that
+        /// merely FEEDS UnitTaskforce - and only when it has a value, never clearing it -
+        /// so UnitTaskforce is sticky once set while Side can go absent again.
+        ///
+        /// The result was a contact reported as <c>Classified = true</c> and
+        /// <c>Relationship = "Unknown"</c> in the same breath: the player saw a red
+        /// sonar-classified track, and the commander was told it was an unknown that
+        /// "could be a neutral merchant" and held fire on an escort mission. Two fields of
+        /// one Contact disagreeing is a bug that reads as bad tactical judgement.
+        ///
+        /// Deferring to CurrentRelationship() also picks up the branch this never had: a
+        /// ForcedRelationState set on the vehicle's entity, which is how a scenario
+        /// declares a relationship no sensor established.
+        /// </summary>
+        private static string DescribeRelationship(Vehicle veh)
         {
-            var side = veh.Side;
-            if (!side.HasValue || side.Value.Value == null) return "Unknown";
-
             try
             {
-                return tf.RelationshipTo(side.Value.Value).ToString();
+                return veh.CurrentRelationship().ToString();
             }
             catch (Exception)
             {
+                // CurrentRelationship reaches into the ECS world for the forced-relation
+                // branch, which is not worth a decision over.
                 return "Unknown";
             }
         }
