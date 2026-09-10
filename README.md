@@ -55,8 +55,11 @@ stalling a frame.
 dotnet build
 ```
 
-Output lands in `bin/Debug/` and is copied into `BepInEx/plugins/` automatically.
-Skip the copy with `-p:DeployToGame=false`. If your Steam library is elsewhere:
+Output lands in `bin/Debug/` and is deployed into the game as its own mod folder at
+`Sea Power_Data/StreamingAssets/SeaPowerAICommander/` — **not** `BepInEx/plugins/`. Anchor
+Chain finds mods by scanning the game's own mod search paths, so a dev build installs
+exactly like a Workshop item and appears in the in-game mod menu. Skip the copy with
+`-p:DeployToGame=false`. If your Steam library is elsewhere:
 
 ```bash
 dotnet build -p:SeaPowerDir="D:\Steam\steamapps\common\Sea Power"

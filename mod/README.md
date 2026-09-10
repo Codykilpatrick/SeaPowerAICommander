@@ -134,8 +134,11 @@ From the repo root:
 dotnet build
 ```
 
-Output lands in `bin/Debug/` and is copied into `BepInEx/plugins/` automatically. Skip the
-copy with `-p:DeployToGame=false`. If your Steam library is elsewhere:
+Output lands in `bin/Debug/` and is deployed into the game as its own mod folder at
+`Sea Power_Data/StreamingAssets/SeaPowerAICommander/` — **not** `BepInEx/plugins/`. Anchor
+Chain finds mods by scanning `FileManager.Directories`, the game's own mod search paths, so
+a dev build installs exactly like a Workshop item and appears in the in-game mod menu. Skip
+the copy with `-p:DeployToGame=false`. If your Steam library is elsewhere:
 
 ```bash
 dotnet build -p:SeaPowerDir="D:\Steam\steamapps\common\Sea Power"
@@ -147,6 +150,11 @@ shipping copies would break type identity.
 **Sea Power cannot hot-reload code mods.** Toggling the mod only reloads the scene; you
 must fully close and reopen the game to load or unload it. Prompt changes need only a
 sidecar restart, which is one of the reasons the brain is out of process.
+
+The folder name comes from `ModDeployDir` in `Directory.Build.props`. If you ever change
+it, **delete the old folder from StreamingAssets**: Anchor Chain registers every subfolder
+that has an `_info.ini`, so a leftover one loads a second copy of the mod — two Harmony
+patch sets on the same hook, two plugins, and double the decisions and the spend.
 
 ## Known limits
 
