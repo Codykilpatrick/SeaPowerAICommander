@@ -270,6 +270,7 @@ namespace SeaPowerAICommander.Orders
             if (order.SpeedKnots <= 0.01f)
             {
                 unit.SetSpeedCommand(new ZeroSpeed());
+                ClaimExplicitSpeed(unit);
                 return true;
             }
 
@@ -278,7 +279,29 @@ namespace SeaPowerAICommander.Orders
             var knots = (max > 0f && order.SpeedKnots > max) ? max : order.SpeedKnots;
 
             unit.SetSpeedCommand(new ConstantSpeed(knots, unit));
+            ClaimExplicitSpeed(unit);
             return true;
+        }
+
+        /// <summary>
+        /// Tell a submarine its speed was CHOSEN, not left to it.
+        ///
+        /// Submarine.ApplyAiTransitSpeed re-picks a telegraph from the threat level every
+        /// tick unless _hasExplicitSpeedOrder is set, so setting the speed and stopping
+        /// there achieves nothing - the boat reverts within a tick. Seen as K-boats pinned
+        /// at 20kt whether ordered 8, 10 or 15 (20 being what their own threat scaling
+        /// wanted), which the verify pass reported as "order did not take". It was right.
+        ///
+        /// This is the same flag the game's own waypoint task sets when a waypoint carries
+        /// a speed (GoToWaypointTask:309), so it is the sanctioned way to say a human chose
+        /// this. Deliberately never cleared here: the game clears it on its relative-point
+        /// tasks, which is the behaviour wanted - autonomy resumes when the boat returns to
+        /// station-keeping rather than being suppressed for the rest of the mission.
+        /// </summary>
+        private static void ClaimExplicitSpeed(ObjectBase unit)
+        {
+            var sub = unit as Submarine;
+            if (sub != null) sub._hasExplicitSpeedOrder = true;
         }
 
         /// <summary>
