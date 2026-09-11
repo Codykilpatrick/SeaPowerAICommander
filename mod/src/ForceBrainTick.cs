@@ -613,6 +613,23 @@ namespace SeaPowerAICommander
                             break;
                         }
 
+                        // A ship conducting flight operations does not own its own speed:
+                        // the PerformingAirOps state takes the rudder to turn into the
+                        // wind and restores the telegraph it had when air ops began. The
+                        // order genuinely did not take, but reporting that as a failure
+                        // invites the commander to keep re-issuing it - a carrier
+                        // launching continuously was ordered to 30kt eleven times and sat
+                        // at 18-20 every time. Say what actually owns the speed.
+                        if (unit.PerformingAirOps)
+                        {
+                            ignored++;
+                            Problem(picture,
+                                $"[verify] {unit.Name} ({unit.Id}): ordered {order.SpeedKnots:F0}kt but it is " +
+                                "CONDUCTING FLIGHT OPERATIONS - speed and heading belong to air ops until " +
+                                "the deck is clear, so do not re-order them");
+                            break;
+                        }
+
                         ignored++;
                         Problem(picture,
                             $"[verify] {unit.Name} ({unit.Id}): ordered {order.SpeedKnots:F0}kt " +

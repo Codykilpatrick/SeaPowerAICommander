@@ -258,6 +258,21 @@ namespace SeaPowerAICommander.Picture
         public bool ActiveSonarOn;
 
         /// <summary>
+        /// True while this ship is conducting flight operations.
+        ///
+        /// Its speed and heading are NOT yours while this is set. The vessel enters a
+        /// dedicated PerformingAirOps state that takes the rudder to turn into the wind
+        /// and restores the telegraph it had when air ops began, so a speed order issued
+        /// mid-launch is reverted within a tick.
+        ///
+        /// Reported rather than worked around, because the game is right: turning into the
+        /// wind at a controlled speed is what launching aircraft requires. A carrier
+        /// launching continuously was ordered to 30kt eleven times and sat at 18-20 every
+        /// time, and nothing in the picture explained why.
+        /// </summary>
+        public bool PerformingAirOps;
+
+        /// <summary>
         /// What this unit has sitting on its deck or in its hangar. Null for anything
         /// without a flight deck, which is most units.
         ///

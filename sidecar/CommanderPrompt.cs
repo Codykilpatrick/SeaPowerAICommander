@@ -314,6 +314,13 @@ public static class CommanderPrompt
         dies alone. Use 2 for CAP, Intercept and ASW unless the deck is nearly empty. One
         is fine for AEW, Recon and MPA - those are sensors, not a fight.
 
+        A CARRIER RUNNING AIR OPS DOES NOT OWN ITS OWN SPEED. performingAirOps means the
+        ship is turning into the wind at the speed launching requires, and it will revert
+        any speed you order until the deck is clear. This is correct - it is the price of
+        the sorties you asked for - so do not fight it and do not re-order speed on a ship
+        while that flag is set. If you need the carrier somewhere at a particular speed,
+        stop tasking launches first. Its escorts are unaffected and can still be moved.
+
         aircraftAboard on each own unit lists what that deck actually holds - type, how
         many, and what roles it is fitted for. A unit without the field has no flight deck.
 
