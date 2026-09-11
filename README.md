@@ -99,6 +99,7 @@ dotnet run --project sidecar
 | `AICOMMANDER_MODEL` | `anthropic/claude-opus-4.5` | Any OpenRouter model id that supports structured outputs. |
 | `AICOMMANDER_PREFIX` | `http://127.0.0.1:8787/` | Listener address. Loopback only by design. |
 | `AICOMMANDER_TIMEOUT_SECONDS` | `150` | Per-decision ceiling. Match it to the mod's `SidecarTimeoutMs`. |
+| `AICOMMANDER_REASONING_EFFORT` | `low` | `high` / `medium` / `low`; `none` removes the setting entirely. |
 
 Why out-of-process, and not the Anthropic SDK in the plugin: Unity's Mono runtime is
 hostile to modern BCL dependency trees, the API key stays out of a distributed mod, and
@@ -118,17 +119,36 @@ deterministic-cadence hook to patch for that.
 
 ## Current state
 
-`ObservingBrain` is the default: it logs a one-line picture summary each tick and issues
-no orders. That verifies the tick fires and the picture reads correctly before anything
-touches a unit. Set `DumpPictureJson = true` in the config to see the full serialized
-picture a brain would receive.
+The sidecar commander drives live missions. Its action space is nine order kinds —
+`MoveTo`, `SetSpeed`, `SetWeaponStatus`, `SetEmcon`, `AttackTarget`, `CoordinatedAttack`,
+`Disengage`, `LaunchAirstrike`, `LaunchAircraft` — and it can be pointed at the enemy or,
+via the right-click menu, at [your own fleet](mod/README.md#delegating-your-own-fleet).
 
-Config lives at `BepInEx/config/com.codykilpatrick.aicommander.cfg`.
+`ObservingBrain` remains the config default: it logs a one-line picture summary each tick
+and issues no orders, which verifies the tick fires and the picture reads correctly before
+anything touches a unit. Set `DumpPictureJson = true` to see the full serialized picture a
+brain would receive. Config lives at `BepInEx/config/com.codykilpatrick.aicommander.cfg`.
+
+**There is no test suite.** Verification is a build plus a live mission, and because the
+game cannot hot-reload code mods, a mod-side change is only proven once you have closed
+the game and reopened it. Every picture the sidecar sends is saved under
+`sidecar/bin/Debug/net8.0/pictures/` — that is the only record of what the model actually
+received, and the first place to look before theorising about a bad decision.
+
+Known open thread: the game re-asserts its own speed on carriers conducting air ops and on
+submarines under transit AI, so a `SetSpeed` order can be silently undone. Both paths have
+fixes committed; neither has been exercised in a live mission yet. `orderProblems` in the
+picture is the verify pass that reports it — a repeated entry there means an order is not
+taking.
 
 ## Extending
 
-**Add an order type:** add to `ForceOrderKind`, implement it in `OrderExecutor.ApplyOne`,
-keep validation in the executor. That enum is the whole action space.
+**Add an order type:** four places, and the fourth is the one that gets forgotten because
+the other three sit together and it does not — add to `ForceOrderKind`, classify it in
+`ForceOrderKinds.IsPositionDependent`, implement it in `OrderExecutor.ApplyOne`, then read
+your new field out of the model's response in `OpenRouterClient.Parse`. Miss that last one
+and the field arrives null however correct the schema is. That enum is the whole action
+space; keep validation in the executor.
 
 **Write a real brain:** implement `IForceBrain`, return it from `Plugin.CreateBrain()`.
 
