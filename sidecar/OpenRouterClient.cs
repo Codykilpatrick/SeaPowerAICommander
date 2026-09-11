@@ -210,6 +210,16 @@ public sealed class OpenRouterClient : IDisposable
                 Salvo = (int)(o["salvo"]?.GetValue<double>() ?? 1),
                 CoordinationGroup = o["coordinationGroup"]?.GetValue<string>() ?? string.Empty,
                 StrikeType = o["strikeType"]?.GetValue<string>() ?? "Bomb",
+
+                // No fallback value for these two, unlike every field above. A missing
+                // weaponStatus defaulting to "Tight" is a harmless placeholder; a missing
+                // emcon defaulting to "Radiate" would light up a ship nobody asked to
+                // light up, and a missing airMission defaulting to "CAP" would burn an
+                // airframe and a deck cycle on a sortie nobody ordered. Empty reaches the
+                // executor, which refuses it and says which field was blank.
+                Emcon = o["emcon"]?.GetValue<string>() ?? string.Empty,
+                AirMission = o["airMission"]?.GetValue<string>() ?? string.Empty,
+
                 Reason = o["reason"]?.GetValue<string>() ?? string.Empty,
             });
         }
