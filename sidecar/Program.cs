@@ -174,7 +174,24 @@ static async Task HandleAsync(HttpListenerContext ctx, OpenRouterClient client, 
     {
         // Never take the sidecar down over one bad cycle - the mod treats a failed
         // request as "no orders" and simply tries again next tick.
-        lock (Log.Gate) Console.Error.WriteLine($"  ! [{picture?.TaskforceName ?? "?"}] {ex.Message}");
+        //
+        // The inner exceptions are the whole point of this line. HttpRequestException's
+        // own Message is the useless generic "An error occurred while sending the
+        // request", and a socket reset, a TLS failure, a DNS timeout and an aborted
+        // response all produce it identically - three failures in thirteen decisions
+        // looked like one fault and could have been any of them. Also stamped with the
+        // elapsed time and the picture's size, because failures clustered at the top of
+        // a latency curve and it mattered whether that was the cause.
+        var chain = new StringBuilder(ex.Message);
+        for (var inner = ex.InnerException; inner != null; inner = inner.InnerException)
+            chain.Append(" <- ").Append(inner.GetType().Name).Append(": ").Append(inner.Message);
+
+        var failedAfter = (DateTime.UtcNow - started).TotalSeconds;
+        lock (Log.Gate)
+            Console.Error.WriteLine(
+                $"  ! [{picture?.TaskforceName ?? "?"}] after {failedAfter:F1}s " +
+                $"(own={picture?.OwnUnits?.Count ?? -1} contacts={picture?.Contacts?.Count ?? -1}): " +
+                $"{ex.GetType().Name}: {chain}");
         try { await WriteAsync(ctx, 500, "{\"error\":\"decision failed\"}"); } catch { /* client gone */ }
     }
 }
