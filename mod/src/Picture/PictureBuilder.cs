@@ -488,6 +488,58 @@ namespace SeaPowerAICommander.Picture
         /// whose position we actually hold - a bearing-only track has no bearing geometry
         /// worth sampling.
         /// </summary>
+        /// <summary>
+        /// Range from the nearest own unit to this contact, and which unit that is.
+        ///
+        /// The force-centre range is the wrong number for anything detached, and a
+        /// commander with only that number guesses. A scout 100nm ahead of the formation
+        /// had a contact reported at 168nm, estimated its own range at 36nm, and ordered a
+        /// torpedo shot that the game silently declined because the real range was far
+        /// beyond the weapon's 40nm.
+        ///
+        /// Runs over own units per contact, which is O(units x contacts) - roughly 34 x 21
+        /// at the largest observed, cheap against the plotting-table walk already happening
+        /// in this same pass.
+        /// </summary>
+        private static void ApplyNearestUnitRange(TacticalPicture picture, Contact contact)
+        {
+            if (!contact.Latitude.HasValue || !contact.Longitude.HasValue) return;
+            if (picture.OwnUnits == null || picture.OwnUnits.Count == 0) return;
+
+            try
+            {
+                var target = new GeoPosition(contact.Latitude.Value, contact.Longitude.Value);
+
+                var best = float.MaxValue;
+                var bestId = 0;
+
+                for (int i = 0; i < picture.OwnUnits.Count; i++)
+                {
+                    var u = picture.OwnUnits[i];
+
+                    // A unit with no position cannot be measured from. Unlike a contact,
+                    // that means the read failed rather than that it is a bearing-only
+                    // hold, so skipping is right either way.
+                    if (u == null || (u.Latitude == 0.0 && u.Longitude == 0.0)) continue;
+
+                    var from = new GeoPosition(u.Latitude, u.Longitude);
+                    var nm = (float)from.getDistanceInMiles(target);
+                    if (float.IsNaN(nm) || float.IsInfinity(nm)) continue;
+
+                    if (nm < best) { best = nm; bestId = u.Id; }
+                }
+
+                if (bestId == 0) return;
+
+                contact.RangeFromNearestUnitNM = Finite(best);
+                contact.NearestUnitId = bestId;
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.LogWarning($"[picture] nearest-unit range failed for contact {contact.Id}: {ex.Message}");
+            }
+        }
+
         private static void ApplyTerrain(Contact contact, GeoPosition? centreOrNull)
         {
             if (!centreOrNull.HasValue) return;
@@ -618,6 +670,7 @@ namespace SeaPowerAICommander.Picture
                 ApplyVelocity(contact, veh);
                 ApplyThreatEnvelope(contact, veh, obj);
                 ApplyTerrain(contact, centre);
+                ApplyNearestUnitRange(picture, contact);
 
                 picture.Contacts.Add(contact);
             }

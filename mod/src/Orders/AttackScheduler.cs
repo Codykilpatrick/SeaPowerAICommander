@@ -134,6 +134,10 @@ namespace SeaPowerAICommander.Orders
 
         private const float KnotsToMetresPerSecond = 0.514444f;
 
+        /// <summary>Beyond this a flight-time estimate is treated as wrong rather than
+        /// long. Twenty minutes covers any real shot in this game with margin.</summary>
+        private const float MaxCredibleFlightSeconds = 1200f;
+
         /// <summary>
         /// Rough time of flight for the longest-reaching weapon this unit carries against
         /// that target. Straight-line range over nominal weapon speed - good enough to
@@ -179,7 +183,28 @@ namespace SeaPowerAICommander.Orders
                 if (fastest <= 1f) return 0f;
 
                 var seconds = metres / fastest;
-                return (float.IsNaN(seconds) || float.IsInfinity(seconds)) ? 0f : seconds;
+                if (float.IsNaN(seconds) || float.IsInfinity(seconds)) return 0f;
+
+                // A sanity ceiling, because a wrong estimate here is worse than no
+                // estimate. Switching to MaxVelocity fixed the cruise-missile case but not
+                // every weapon populates it either: a SAM group against a Tu-95 still came
+                // back at 2,353s, so the shorter-ranged shooters were held back 39 minutes
+                // to "arrive together" and the saturation attack went in piecemeal - the
+                // exact failure the whole scheduler exists to prevent.
+                //
+                // Nothing in this game flies for twenty minutes to a target its shooter can
+                // actually see. Past that the figure is not a long flight, it is a bad
+                // number, and firing together beats staggering on a fiction.
+                if (seconds > MaxCredibleFlightSeconds)
+                {
+                    Plugin.Log.LogWarning(
+                        $"[attack] discarding implausible flight estimate of {seconds:F0}s for " +
+                        $"{unit.getName()} ({metres / 1852f:F0}nm at {fastest:F0} m/s) - " +
+                        "firing together instead of staggering on a bad number");
+                    return 0f;
+                }
+
+                return seconds;
             }
             catch (Exception)
             {

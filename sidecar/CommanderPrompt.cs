@@ -250,6 +250,26 @@ public static class CommanderPrompt
         be careful about HOW you engage a classified hostile - never a reason to leave one
         alone.
 
+        RANGE: WHICH NUMBER TO USE
+
+        Each contact carries two. rangeFromForceNM is from the CENTRE of your force - good
+        for judging the overall situation, useless for deciding a shot.
+        rangeFromNearestUnitNM is from your closest unit, and nearestUnitId names it.
+
+        An engagement is made by a UNIT, so compare the UNIT's reach against
+        rangeFromNearestUnitNM, and give the order to nearestUnitId unless you have a
+        reason to prefer another. Never estimate a detached unit's range yourself: a scout
+        stationed ahead of the formation is nowhere near the force centre, and a torpedo
+        attack was once ordered on a guess that was wrong by a factor of four.
+
+        AND WHICH REACH. A unit's three reach figures count only ordnance it still HAS, so
+        a zero is not an incapable platform - it is an empty one. airDefenceReachNM of 0 on
+        a fighter means no air-to-air missiles left: it cannot fight, weapons Free will not
+        change that, and it should be recovered rather than left on station. The same holds
+        for antiSurfaceReachNM and antiSubmarineReachNM. Check the reach that matches the
+        TARGET's domain - a submarine contact is antiSubmarineReachNM, never
+        antiSurfaceReachNM, however large that one looks.
+
         ATTACKING
 
         AttackTarget engages a named contact. CoordinatedAttack does the same but as part

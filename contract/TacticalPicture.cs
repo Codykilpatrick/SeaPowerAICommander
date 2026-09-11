@@ -450,6 +450,26 @@ namespace SeaPowerAICommander.Picture
         public float RangeFromForceNM;
 
         /// <summary>
+        /// Range in nautical miles from the CLOSEST of our own units, and which one.
+        ///
+        /// <see cref="RangeFromForceNM"/> is measured from the centre of the force, which
+        /// is the wrong number for anything detached. A scout stationed 100nm ahead of the
+        /// formation had a submarine contact reported at 168nm - the distance from the
+        /// formation - and the commander, having nothing better, estimated the scout's own
+        /// range at 36nm and ordered a torpedo attack. The real range was far outside the
+        /// 40nm the weapon had, the game declined to fire, and nothing said why.
+        ///
+        /// Engagement decisions are made by a UNIT, so they need that unit's range. This
+        /// gives the best case directly, and names the unit so the order can be given to
+        /// the one that can actually reach.
+        /// </summary>
+        public float RangeFromNearestUnitNM;
+
+        /// <summary>Id of the own unit <see cref="RangeFromNearestUnitNM"/> was measured
+        /// from. 0 when the force has no positioned units.</summary>
+        public int NearestUnitId;
+
+        /// <summary>
         /// Highest terrain in metres on the bearing from the force centre to this contact.
         ///
         /// Above zero means land lies between - an approach on this bearing can be masked,

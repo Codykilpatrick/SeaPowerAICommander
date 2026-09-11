@@ -454,16 +454,24 @@ namespace SeaPowerAICommander.Orders
             role    = ObjectBaseParameters.UnitRoles.None;
             loadout = "Default";
 
+            // Roles are the AIRFRAME's tags, and aircraft use a different vocabulary from
+            // ships. AAW is a SHIP role - an air-defence escort. A carrier fighter is
+            // tagged Fighter, so asking a deck for an AAW airframe matched nothing:
+            // Nimitz reported "no AAW airframe aboard" while holding ten F-14As, fell back
+            // to launching anything, and put A-7E bombers up on combat air patrol.
+            //
+            // Verified against a live deck: F-14A=Fighter, A-7E=Bomber/SEAD, E-2C=AEW/ESM,
+            // SH-3H=ASW/SAR. Every role below exists in UnitRoles.
             switch ((raw ?? "").Trim().ToLowerInvariant())
             {
                 case "cap":
                     mission = FlightDeckTask.MissionType.CAP;
-                    role    = ObjectBaseParameters.UnitRoles.AAW;
+                    role    = ObjectBaseParameters.UnitRoles.Fighter;
                     return true;
 
                 case "intercept":
                     mission = FlightDeckTask.MissionType.Intercept;
-                    role    = ObjectBaseParameters.UnitRoles.AAW;
+                    role    = ObjectBaseParameters.UnitRoles.Fighter;
                     return true;
 
                 case "asw":
@@ -475,14 +483,17 @@ namespace SeaPowerAICommander.Orders
 
                 case "aew":
                     mission = FlightDeckTask.MissionType.AEW;
+                    role    = ObjectBaseParameters.UnitRoles.AEW;
                     return true;
 
                 case "recon":
                     mission = FlightDeckTask.MissionType.Recon;
+                    role    = ObjectBaseParameters.UnitRoles.Recon;
                     return true;
 
                 case "mpa":
                     mission = FlightDeckTask.MissionType.MPA;
+                    role    = ObjectBaseParameters.UnitRoles.MPA;
                     return true;
 
                 default:
