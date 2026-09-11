@@ -258,6 +258,17 @@ namespace SeaPowerAICommander.Picture
         public bool ActiveSonarOn;
 
         /// <summary>
+        /// What this unit has sitting on its deck or in its hangar. Null for anything
+        /// without a flight deck, which is most units.
+        ///
+        /// Without it the commander could not tell a carrier from a cruiser except by
+        /// reading the name, and it showed: it repeatedly described its aircraft as
+        /// wasted assets while having no way to know what was aboard, let alone launch
+        /// it. An air group you cannot see is an air group you will not use.
+        /// </summary>
+        public List<DeckAircraft> AircraftAboard;
+
+        /// <summary>
         /// True when this unit is stationed in a formation.
         ///
         /// A formation follower takes its movement from the leader, so a MoveTo aimed at
@@ -328,6 +339,21 @@ namespace SeaPowerAICommander.Picture
 
         public float HeadingDeg;
         public float MaxSpeedKnots;
+    }
+
+    /// <summary>One airframe type sitting on a flight deck, and how many of it.</summary>
+    public class DeckAircraft
+    {
+        /// <summary>Airframe name as the game displays it, e.g. "SH-3D Sea King".</summary>
+        public string Type;
+
+        /// <summary>How many are aboard and available.</summary>
+        public int Count;
+
+        /// <summary>What it is for - ASW, AAW and so on. Comma-separated; the reason a
+        /// commander can tell a sub-hunter from an interceptor without knowing the
+        /// airframe.</summary>
+        public string Roles;
     }
 
     public class Contact

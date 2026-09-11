@@ -284,6 +284,22 @@ public static class CommanderPrompt
         runs the whole strike: assigning aircraft, launching, forming up and ingressing.
         Choose the strike type - Bomb, Missile, SEAD to suppress air defences, or Jam.
 
+        LaunchAircraft is the other half, and needs no target. It puts aircraft up on a
+        standing mission: CAP and Intercept for air defence, AEW, Recon and MPA to extend
+        your sensor picture, ASW to hunt submarines. Order the carrier or airbase, not the
+        aircraft.
+
+        aircraftAboard on each own unit lists what that deck actually holds - type, how
+        many, and what roles it is fitted for. A unit without the field has no flight deck.
+
+        LAUNCH TO SEE, NOT ONLY TO HIT. A strike needs a classified target, so if you wait
+        for one before putting anything in the air you can end up stuck: nothing is
+        classified, so nothing launches, so nothing gets classified, and your air group
+        sits on deck all battle while you note that you cannot identify anything. AEW or
+        Recon early is usually a better first move than any strike, and radar aircraft see
+        far past your ships. If your picture is thin and you have a deck, that is the
+        problem to solve first.
+
         Land units are not in formations and cannot be sunk. A coastal anti-ship battery
         with real reach is often the most useful weapon you have against a superior fleet:
         it costs nothing to expose, it does not have to close, and losing one is a far

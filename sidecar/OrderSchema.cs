@@ -84,6 +84,12 @@ public static class OrderSchema
                     ["enum"] = new JsonArray("Silent", "Radiate"),
                     ["description"] = "SetEmcon only. \"Silent\" shuts down search radars, active sonar and jamming together; \"Radiate\" switches the search radars back on. Use \"Radiate\" for other order kinds.",
                 },
+                ["airMission"] = new JsonObject
+                {
+                    ["type"] = "string",
+                    ["enum"] = new JsonArray("CAP", "AEW", "Recon", "MPA", "ASW", "Intercept"),
+                    ["description"] = "LaunchAircraft only. The standing mission to launch on: CAP and Intercept are air defence, AEW and Recon and MPA extend your sensor picture, ASW hunts submarines. Use \"CAP\" for other order kinds.",
+                },
                 ["reason"] = new JsonObject
                 {
                     ["type"] = "string",
@@ -94,7 +100,8 @@ public static class OrderSchema
             // "use 0 / use Tight" notes above for fields a given kind ignores.
             ["required"] = new JsonArray(
                 "kind", "unitId", "latitude", "longitude", "speedKnots", "weaponStatus",
-                "targetContactId", "salvo", "coordinationGroup", "strikeType", "emcon", "reason"),
+                "targetContactId", "salvo", "coordinationGroup", "strikeType", "emcon",
+                "airMission", "reason"),
             ["additionalProperties"] = false,
         };
 

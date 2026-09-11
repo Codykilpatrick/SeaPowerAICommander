@@ -151,6 +151,9 @@ namespace SeaPowerAICommander.Orders
                 case ForceOrderKind.SetEmcon:
                     return SetEmcon(unit, order);
 
+                case ForceOrderKind.LaunchAircraft:
+                    return LaunchAircraft(unit, order);
+
                 default:
                     Plugin.Log.LogWarning($"[orders] unknown kind {order.Kind}");
                     return false;
@@ -351,6 +354,109 @@ namespace SeaPowerAICommander.Orders
         /// formed up without the commander having to move them individually - which it
         /// could not do anyway, since parked aircraft ignore movement and speed orders.
         /// </summary>
+        /// <summary>
+        /// Put aircraft up on a standing mission, with no target required.
+        ///
+        /// Tries the role that matches the mission first, then any airframe. The role
+        /// filter is worth attempting - it is what stops an ASW helicopter being sent up
+        /// as combat air patrol - but a deck with nothing of that role returns false, and
+        /// on a mixed or oddly-tagged deck a permissive launch is better than none.
+        /// </summary>
+        private static bool LaunchAircraft(ObjectBase unit, ForceOrder order)
+        {
+            if (unit._obp == null || unit._obp._flightDeck == null)
+            {
+                Plugin.Log.LogWarning(
+                    $"[air] LaunchAircraft: {unit.getName()} has no flight deck - order a carrier or airbase");
+                return false;
+            }
+
+            var deck = unit._obp._flightDeck;
+            if (deck.TotalVehiclesOnBoard() < 1)
+            {
+                Plugin.Log.LogWarning($"[air] LaunchAircraft: {unit.getName()} has nothing left aboard");
+                return false;
+            }
+
+            if (!ParseAirMission(order.AirMission, out var mission, out var role, out var loadout))
+            {
+                Plugin.Log.LogWarning(
+                    $"[air] LaunchAircraft: unrecognised mission '{order.AirMission}' " +
+                    "(expected CAP, AEW, Recon, MPA, ASW or Intercept)");
+                return false;
+            }
+
+            if (unit.FlightDeckLaunchUnit(ObjectBase.ObjectType.Any, loadout, role, mission))
+            {
+                Plugin.Log.LogInfo($"[air] {unit.getName()} launching a {mission} sortie");
+                return true;
+            }
+
+            // Nothing of that role aboard, or no loadout for it. Try again unfiltered
+            // before giving up.
+            if (role != ObjectBaseParameters.UnitRoles.None
+                && unit.FlightDeckLaunchUnit(ObjectBase.ObjectType.Any, loadout,
+                                             ObjectBaseParameters.UnitRoles.None, mission))
+            {
+                Plugin.Log.LogInfo(
+                    $"[air] {unit.getName()} launching a {mission} sortie " +
+                    $"(no {role} airframe aboard - sent what there was)");
+                return true;
+            }
+
+            // Said plainly, because the alternative is the stalled-airstrike problem all
+            // over again: an order that reports success and produces no aircraft.
+            Plugin.Log.LogWarning(
+                $"[air] LaunchAircraft: {unit.getName()} could not launch a {mission} sortie - " +
+                "nothing suitable aboard, no loadout, or the deck is busy");
+            return false;
+        }
+
+        private static bool ParseAirMission(string raw,
+                                            out FlightDeckTask.MissionType mission,
+                                            out ObjectBaseParameters.UnitRoles role,
+                                            out string loadout)
+        {
+            mission = FlightDeckTask.MissionType.None;
+            role    = ObjectBaseParameters.UnitRoles.None;
+            loadout = "Default";
+
+            switch ((raw ?? "").Trim().ToLowerInvariant())
+            {
+                case "cap":
+                    mission = FlightDeckTask.MissionType.CAP;
+                    role    = ObjectBaseParameters.UnitRoles.AAW;
+                    return true;
+
+                case "intercept":
+                    mission = FlightDeckTask.MissionType.Intercept;
+                    role    = ObjectBaseParameters.UnitRoles.AAW;
+                    return true;
+
+                case "asw":
+                    mission = FlightDeckTask.MissionType.SearchAndDestroyASW;
+                    role    = ObjectBaseParameters.UnitRoles.ASW;
+                    // The game maps "ASW" to an ASWHunter loadout itself when one exists.
+                    loadout = "ASW";
+                    return true;
+
+                case "aew":
+                    mission = FlightDeckTask.MissionType.AEW;
+                    return true;
+
+                case "recon":
+                    mission = FlightDeckTask.MissionType.Recon;
+                    return true;
+
+                case "mpa":
+                    mission = FlightDeckTask.MissionType.MPA;
+                    return true;
+
+                default:
+                    return false;
+            }
+        }
+
         private static bool LaunchAirstrike(ObjectBase unit, ForceOrder order)
         {
             var target = ResolveContact(unit._taskforce, order.TargetContactId);

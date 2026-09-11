@@ -84,6 +84,22 @@ namespace SeaPowerAICommander.Orders
         /// force-level one.
         /// </summary>
         SetEmcon,
+
+        /// <summary>
+        /// Put aircraft in the air on a standing mission - CAP, AEW, Recon, MPA, ASW or
+        /// Intercept.
+        ///
+        /// <see cref="LaunchAirstrike"/> needs a contact to strike, which makes it useless
+        /// in exactly the situation where aircraft matter most: nothing is classified yet,
+        /// so nothing can be struck, so nothing launches, so nothing gets classified. A
+        /// GIUK interception was lost inside that loop with both sides' air groups parked
+        /// on deck, each commander noting it could not classify anything.
+        ///
+        /// This is the other half of the air picture: launching to SEE rather than to
+        /// hit. An AEW bird or a recon sweep is usually a better first move than any
+        /// strike, and it was the one move unavailable.
+        /// </summary>
+        LaunchAircraft,
     }
 
     public static class ForceOrderKinds
@@ -118,6 +134,7 @@ namespace SeaPowerAICommander.Orders
                 case ForceOrderKind.Disengage:
                 case ForceOrderKind.LaunchAirstrike:
                 case ForceOrderKind.SetEmcon:
+                case ForceOrderKind.LaunchAircraft:
                     return false;
 
                 default:
@@ -165,6 +182,11 @@ namespace SeaPowerAICommander.Orders
 
         /// <summary>SetEmcon only: "Silent" | "Radiate".</summary>
         public string Emcon;
+
+        /// <summary>
+        /// LaunchAircraft only: "CAP" | "AEW" | "Recon" | "MPA" | "ASW" | "Intercept".
+        /// </summary>
+        public string AirMission;
 
         /// <summary>Free text for the log. Useful when a brain should explain itself.</summary>
         public string Reason;

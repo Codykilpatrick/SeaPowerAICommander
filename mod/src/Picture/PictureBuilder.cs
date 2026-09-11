@@ -290,6 +290,7 @@ namespace SeaPowerAICommander.Picture
                         obj.ActsIndependentlyInFormation != null && obj.ActsIndependentlyInFormation.Value,
                 };
 
+                ApplyDeck(unit, obj);
                 ApplyFormation(unit, obj);
                 ApplyCommandedSpeed(unit, obj);
                 ApplyRoute(unit, obj);
@@ -312,6 +313,57 @@ namespace SeaPowerAICommander.Picture
         /// ignored. It cost three false "order did not take" warnings before the cause was
         /// clear.
         /// </summary>
+        /// <summary>
+        /// What is on the flight deck, for the units that have one.
+        ///
+        /// Left null rather than empty for everything else: with WhenWritingNull the field
+        /// then disappears from the payload entirely, and a destroyer carrying nothing
+        /// should not spend tokens saying so on every cycle.
+        /// </summary>
+        private static void ApplyDeck(OwnUnit unit, ObjectBase obj)
+        {
+            try
+            {
+                var deck = obj._obp != null ? obj._obp._flightDeck : null;
+                if (deck == null || deck._vehiclesOnBoard == null) return;
+
+                List<DeckAircraft> aboard = null;
+
+                foreach (var v in deck._vehiclesOnBoard)
+                {
+                    if (v == null || v.Numbers < 1) continue;
+
+                    aboard ??= new List<DeckAircraft>();
+                    aboard.Add(new DeckAircraft
+                    {
+                        Type = string.IsNullOrEmpty(v.DisplayName) ? "(unnamed)" : v.DisplayName,
+                        Count = v.Numbers,
+                        Roles = DescribeDeckRoles(v),
+                    });
+                }
+
+                unit.AircraftAboard = aboard;
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.LogWarning($"[picture] deck unreadable for {obj.getName()}: {ex.Message}");
+            }
+        }
+
+        private static string DescribeDeckRoles(VehicleTypeOnBoard v)
+        {
+            if (v._unitRoles == null || v._unitRoles.Count == 0) return "";
+
+            var sb = new System.Text.StringBuilder();
+            foreach (var role in v._unitRoles)
+            {
+                if (role == ObjectBaseParameters.UnitRoles.None) continue;
+                if (sb.Length > 0) sb.Append(", ");
+                sb.Append(role.ToString());
+            }
+            return sb.ToString();
+        }
+
         private static void ApplyFormation(OwnUnit unit, ObjectBase obj)
         {
             try
