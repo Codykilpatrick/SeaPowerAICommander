@@ -105,6 +105,36 @@ exclusively, and the rename is part of the fix. **Do not reintroduce a name that
 whose a briefing is.** The mission format numbers opening messages by task force
 (`Taskforce1StartMessage=`) but nothing maps a number onto the force being commanded.
 
+## The game assumes a human is driving — and quietly undoes orders
+
+**Read this before debugging any "the order did not take" report.**
+
+Sea Power is full of autonomy gated on flags the player's own UI sets. A mod that writes
+the state without the flag gets silently overridden, usually within a tick, and the order
+looks accepted the whole way. Delegating the player's force means finding each gate, and
+there is **no single fix** — each wants a different answer:
+
+| Mechanism | Symptom | Right response |
+|---|---|---|
+| `CheckForPlayerAbort` | any `IsPlayerObject` unit reverts weapons Free→Tight on reaching a waypoint | **suppress** — `PlayerAbortGuard`, scoped to delegated forces only |
+| `Submarine.ApplyAiTransitSpeed` | boat re-picks its own speed every tick | **claim the flag** — set `_hasExplicitSpeedOrder`, as the game's waypoint task does |
+| Aircraft AI states (`MPA`/`CAP`/`Intercept`/`AEW`) | waypoints wiped; routes rebuilt from `SetRelativeToStationWaypointTask` | **refuse** — `MoveTo` is rejected for air units |
+| `Vessel` `PerformingAirOps` | launching carrier ignores speed AND course | **report it** — the game is right; say so and don't fight it |
+| `Winchester` | non-player aircraft drops to Hold | **nothing** — it is out of ordnance, which the reach fields already show as 0 |
+
+Two traps worth naming:
+
+- **`ObjectBase.setPlayerCommandOverride` is not the fix for aircraft.** It looks like
+  one. `AircraftStates/PlayerOverride` flies the aircraft by `Input.mousePosition`, and at
+  priority 1 it also suppresses bingo-fuel and missile evasion.
+- **Reach fields count only ordnance still aboard.** `airDefenceReachNM == 0` on a fighter
+  means *empty*, not *incapable*. That signal sat unused in every picture for a whole
+  session because nothing said what it meant.
+
+Do not diagnose these from the decompile alone. Several confident readings were wrong —
+Winchester for player aircraft, formation speed caps, the ammunition gate on launches.
+**Read a saved picture instead** (see Testing): it shows exactly what the model got.
+
 ## Patching the game's UI
 
 The game's context menu is built imperatively in C# and its XAML is baked into Noesis
@@ -162,8 +192,25 @@ same enum `OrderExecutor` switches on — so the model cannot emit an order the 
 no way to carry out. The executor still validates every order against the live task force:
 a bad unit id is dropped with a log line, never thrown.
 
-Adding an order kind: add to `ForceOrderKind`, classify it in `IsPositionDependent`,
-implement it in `OrderExecutor.ApplyOne`, keep validation in the executor.
+### Adding an order kind touches FOUR places
+
+1. `ForceOrderKind` — the enum the schema's kind list generates from.
+2. `ForceOrderKinds.IsPositionDependent` — classify it, or it defaults to perishable.
+3. `OrderExecutor.ApplyOne` — implement it; keep validation in the executor.
+4. **`OpenRouterClient.Parse`** — read your new field out of the model's response.
+
+Step 4 is the one that gets forgotten, because the other three sit near each other and it
+does not. `Parse` hand-maps every property by name, so a field missing from it arrives
+null however correct the schema is. This has already shipped twice: `SetEmcon` and
+`LaunchAircraft` both went live with their fields in the contract, the schema AND the
+executor, and every single order was refused with an empty value until `Parse` caught up.
+
+Update `OrderExecutor.Describe` too, or the log prints a bare kind with no parameters -
+which is how you end up unable to tell `SetEmcon Silent` from `SetEmcon Radiate` in a
+post-mortem.
+
+Prefer reusing an existing field to adding a fifth. `salvo` already means "how many" and
+is wired through all four places.
 
 ## Testing
 
@@ -178,7 +225,24 @@ Useful signals in a live run:
   player's fleet, or `=== Derived objective ... ===` when driving the enemy. The wrong one
   means briefing attribution is broken.
 - `Debug.LogUnitState` (on by default) gives one readable line per unit and contact per
-  decision — far easier to read than `DumpPictureJson`.
+  decision — far easier to read than `DumpPictureJson`. Note it does NOT print roles or
+  reach for every field, so it is a summary, not the payload.
+- **Every picture sent is saved** to `sidecar/bin/Debug/net8.0/pictures/picture-*.json`.
+  This is the best debugging tool in the repo and the only way to see what the model
+  actually received. Reach for it before theorising — it settled three wrong diagnoses in
+  one evening. PowerShell reads it in one line:
+  ```powershell
+  (Get-Content picture-XXXX.json -Raw | ConvertFrom-Json).ownUnits | Select-Object name,roles,damagePercent
+  ```
+- `orderProblems` in the picture is the previous cycle's verify pass — the mod re-checks
+  each accepted order against live state and tells the commander what did not take. A
+  repeated entry means the commander is not reading it, or the cause is not in the picture.
+
+The sidecar handles decisions **concurrently**, one task per request. It needs no locking:
+the mod already allows one decision in flight per task force (`HttpBrain._inFlight` is
+per-instance, one brain per `TaskForceAI`), and spend is bounded by its static rate gate.
+Awaiting in the accept loop instead cost 15 timeouts in one battle once three task forces
+were being driven — each request waited for the previous decision before it even started.
 
 Config lives at `BepInEx/config/com.codykilpatrick.aicommander.cfg`, generated on first
 run. Changing the plugin GUID renames that file and silently resets everything to
