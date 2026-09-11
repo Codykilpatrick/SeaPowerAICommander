@@ -74,7 +74,7 @@ public sealed class OpenRouterClient : IDisposable
         return root["choices"]?[0]?["message"]?["content"]?.GetValue<string>() ?? string.Empty;
     }
 
-    public async Task<ForceOrderSet> DecideAsync(TacticalPicture picture, CancellationToken ct)
+    public async Task<ForceOrderSet> DecideAsync(TacticalPicture picture, CancellationToken ct, StringBuilder log)
     {
         // Resolve the objective before deciding. Derived once per mission and cached, so
         // this costs an extra call on the first cycle only.
@@ -112,7 +112,7 @@ public sealed class OpenRouterClient : IDisposable
         if (!response.IsSuccessStatusCode)
             throw new InvalidOperationException($"OpenRouter returned {(int)response.StatusCode}: {Truncate(raw, 400)}");
 
-        return Parse(raw, picture);
+        return Parse(raw, picture, log);
     }
 
     /// <summary>
@@ -120,7 +120,7 @@ public sealed class OpenRouterClient : IDisposable
     /// they are the part that grows with how hard the tactical problem is rather than with
     /// how big the picture is, and they are invisible in the returned text.
     /// </summary>
-    private static void ReportUsage(JsonObject root)
+    private static void ReportUsage(JsonObject root, StringBuilder log)
     {
         if (root["usage"] is not JsonObject usage) return;
 
@@ -130,7 +130,7 @@ public sealed class OpenRouterClient : IDisposable
         var cached = usage["prompt_tokens_details"]?["cached_tokens"]?.GetValue<int>() ?? 0;
 
         var visible = completion - reasoning;
-        Console.WriteLine(
+        log.AppendLine(
             $"     tokens: in {prompt} ({cached} cached), out {completion} " +
             $"({reasoning} reasoning + {visible} orders)");
     }
@@ -154,7 +154,7 @@ public sealed class OpenRouterClient : IDisposable
         }
     }
 
-    private static ForceOrderSet Parse(string raw, TacticalPicture picture)
+    private static ForceOrderSet Parse(string raw, TacticalPicture picture, StringBuilder log)
     {
         var root = ParseBody(raw, "Decision response");
 
@@ -179,11 +179,11 @@ public sealed class OpenRouterClient : IDisposable
 
         // Printed here rather than carried in the contract, so this needed only a sidecar
         // restart to land mid-session.
-        ReportUsage(root);
+        ReportUsage(root, log);
 
         var assessment = parsed["assessment"]?.GetValue<string>();
         if (!string.IsNullOrWhiteSpace(assessment))
-            Console.WriteLine($"     assessment: {assessment}");
+            log.AppendLine($"     assessment: {assessment}");
 
         if (parsed["orders"] is not JsonArray array) return set;
 

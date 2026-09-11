@@ -65,7 +65,7 @@ public static class OrderSchema
                 ["salvo"] = new JsonObject
                 {
                     ["type"] = "integer",
-                    ["description"] = "AttackTarget and CoordinatedAttack only. How many rounds or missiles to commit. Use 1 for other order kinds.",
+                    ["description"] = "How many to commit. AttackTarget and CoordinatedAttack: rounds or missiles. LaunchAircraft: how many airframes to put up - one call launches ONE aircraft, so use 2 for a pair on CAP. Max 4. Use 1 for other order kinds.",
                 },
                 ["strikeType"] = new JsonObject
                 {

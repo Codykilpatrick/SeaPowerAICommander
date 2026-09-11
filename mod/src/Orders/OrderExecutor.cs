@@ -120,6 +120,10 @@ namespace SeaPowerAICommander.Orders
                     return $"CoordinatedAttack[{order.CoordinationGroup}] contact {order.TargetContactId} salvo {order.Salvo}";
                 case ForceOrderKind.LaunchAirstrike:
                     return $"LaunchAirstrike {order.StrikeType} contact {order.TargetContactId}";
+                case ForceOrderKind.SetEmcon:
+                    return $"SetEmcon {order.Emcon}";
+                case ForceOrderKind.LaunchAircraft:
+                    return $"LaunchAircraft {order.AirMission} x{(order.Salvo <= 0 ? 1 : order.Salvo)}";
                 default:
                     return order.Kind.ToString();
             }
@@ -362,6 +366,10 @@ namespace SeaPowerAICommander.Orders
         /// as combat air patrol - but a deck with nothing of that role returns false, and
         /// on a mixed or oddly-tagged deck a permissive launch is better than none.
         /// </summary>
+        /// <summary>Ceiling on one order. A commander that asks for twelve aircraft has
+        /// misunderstood the order, not found a way to empty its deck in one cycle.</summary>
+        private const int MaxSortiesPerOrder = 4;
+
         private static bool LaunchAircraft(ObjectBase unit, ForceOrder order)
         {
             if (unit._obp == null || unit._obp._flightDeck == null)
@@ -386,21 +394,46 @@ namespace SeaPowerAICommander.Orders
                 return false;
             }
 
-            if (unit.FlightDeckLaunchUnit(ObjectBase.ObjectType.Any, loadout, role, mission))
+            // One call launches ONE airframe - FlightDeckLaunchUnit returns as soon as it
+            // has created a single launch task, and so does the game's own
+            // FlightDeckLaunchCAP. There is no launch-a-flight entry point, so a flight
+            // is N calls. Singles get picked off: a lone fighter on CAP has nobody to
+            // cover it, and real air defence flies in pairs.
+            var wanted = order.Salvo <= 0 ? 1 : order.Salvo;
+            if (wanted > MaxSortiesPerOrder) wanted = MaxSortiesPerOrder;
+
+            var launched = 0;
+            var fellBackToAnyRole = false;
+
+            for (var i = 0; i < wanted; i++)
             {
-                Plugin.Log.LogInfo($"[air] {unit.getName()} launching a {mission} sortie");
-                return true;
+                if (unit.FlightDeckLaunchUnit(ObjectBase.ObjectType.Any, loadout, role, mission))
+                {
+                    launched++;
+                    continue;
+                }
+
+                // Nothing of that role aboard, or no loadout for it. Try unfiltered
+                // before giving up on this airframe.
+                if (role != ObjectBaseParameters.UnitRoles.None
+                    && unit.FlightDeckLaunchUnit(ObjectBase.ObjectType.Any, loadout,
+                                                 ObjectBaseParameters.UnitRoles.None, mission))
+                {
+                    launched++;
+                    fellBackToAnyRole = true;
+                    continue;
+                }
+
+                // The deck ran dry or went busy part-way. Stop asking.
+                break;
             }
 
-            // Nothing of that role aboard, or no loadout for it. Try again unfiltered
-            // before giving up.
-            if (role != ObjectBaseParameters.UnitRoles.None
-                && unit.FlightDeckLaunchUnit(ObjectBase.ObjectType.Any, loadout,
-                                             ObjectBaseParameters.UnitRoles.None, mission))
+            if (launched > 0)
             {
                 Plugin.Log.LogInfo(
-                    $"[air] {unit.getName()} launching a {mission} sortie " +
-                    $"(no {role} airframe aboard - sent what there was)");
+                    $"[air] {unit.getName()} launching {launched} of {wanted} requested " +
+                    $"{mission} sortie(s)" +
+                    (fellBackToAnyRole ? $" (no {role} airframe aboard - sent what there was)" : ""));
                 return true;
             }
 

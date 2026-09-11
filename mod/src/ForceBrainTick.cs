@@ -141,6 +141,16 @@ namespace SeaPowerAICommander
             if (tf.Side == Taskforce.TfType.Player && !Plugin.DrivePlayerTaskforce) return;
             if (tf.Side == Taskforce.TfType.None) return;
 
+            // Neutrals are not belligerents, so there is nothing for a commander to decide
+            // for them. HasArmedUnit below was supposed to cover this and does not: one
+            // armed escort in a merchant group passes it, and the whole convoy then gets
+            // commanded. Observed driving a twelve-ship Neutral force holding ZERO contacts
+            // and trying to set emission control on MV Pacific Highway, a car carrier.
+            //
+            // It cost a third of the spend AND a third of the sidecar's queue depth, which
+            // is what pushed the real belligerents' decisions past the mod's timeout.
+            if (tf.Side == Taskforce.TfType.Neutral) return;
+
             // A side with nothing that can shoot is not a force to command. Baltim puts five
             // civilian shrimp boats in the water as their own task force, and we were building
             // them a full tactical picture every cycle, paying for a decision, and ordering the

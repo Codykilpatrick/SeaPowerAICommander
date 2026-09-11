@@ -79,9 +79,20 @@ while (!shutdown.IsCancellationRequested)
         break;
     }
 
-    // Handle sequentially: the mod submits one picture at a time per task force, and
-    // serialising keeps the console log readable and the spend predictable.
-    await HandleAsync(ctx, client, shutdown.Token);
+    // NOT awaited. Awaiting here served one task force perfectly and broke the moment
+    // there were three: a decision takes ~75s, so the second request waited 75s to
+    // start and the third 150s, which is exactly the mod's SidecarTimeoutMs. Requests
+    // died of old age in the accept queue while this loop was still talking to
+    // OpenRouter about someone else, and because the request had never been read the
+    // sidecar logged no error at all - 15 timeouts on the mod side against a clean
+    // sidecar log.
+    //
+    // Nothing here needs a lock. The mod already allows one decision in flight per task
+    // force (HttpBrain._inFlight, per-instance, one brain per TaskForceAI), and spend is
+    // bounded by its static rate gate rather than by this await. What serialising
+    // actually protected was console readability, which HandleAsync now handles by
+    // printing each decision as one block.
+    _ = HandleAsync(ctx, client, shutdown.Token);
 }
 
 Console.WriteLine("Stopped.");
@@ -111,6 +122,11 @@ static void SavePicture(string payload)
 static async Task HandleAsync(HttpListenerContext ctx, OpenRouterClient client, CancellationToken ct)
 {
     var started = DateTime.UtcNow;
+
+    // Hoisted so the catch can name which task force failed. With decisions running
+    // concurrently, a bare "! The operation has timed out" no longer says whose.
+    TacticalPicture? picture = null;
+
     try
     {
         if (ctx.Request.HttpMethod != "POST")
@@ -125,23 +141,32 @@ static async Task HandleAsync(HttpListenerContext ctx, OpenRouterClient client, 
 
         SavePicture(payload);
 
-        var picture = JsonSerializer.Deserialize<TacticalPicture>(payload, PictureJson.Options);
+        picture = JsonSerializer.Deserialize<TacticalPicture>(payload, PictureJson.Options);
         if (picture is null)
         {
             await WriteAsync(ctx, 400, "{\"error\":\"could not parse picture\"}");
             return;
         }
 
-        Console.WriteLine(
+        // Buffered, not printed as it happens. Decisions now run concurrently, and three
+        // task forces interleaving their headers, assessments and order lines would make
+        // the log useless for exactly the debugging it exists for. Each decision is
+        // written once, as one block, when it completes.
+        var log = new StringBuilder();
+        log.AppendLine(
             $"[{DateTime.Now:HH:mm:ss}] {picture.TaskforceName} ({picture.Side}) " +
             $"t={picture.TimeSeconds:F0}s own={picture.OwnUnits.Count} contacts={picture.Contacts.Count}");
 
-        var orders = await client.DecideAsync(picture, ct);
+        var orders = await client.DecideAsync(picture, ct, log);
 
         var elapsed = (DateTime.UtcNow - started).TotalSeconds;
-        Console.WriteLine($"  -> {orders.Orders.Count} order(s) in {elapsed:F1}s");
+        log.AppendLine($"  -> {orders.Orders.Count} order(s) in {elapsed:F1}s");
         foreach (var o in orders.Orders)
-            Console.WriteLine($"     {o.Kind} unit {o.UnitId}: {o.Reason}");
+            log.AppendLine($"     {o.Kind} unit {o.UnitId}: {o.Reason}");
+
+        // One write per decision. TeeWriter fans out to console and file, so the lock is
+        // what keeps a block from being split across those two by a concurrent decision.
+        lock (Log.Gate) Console.Write(log.ToString());
 
         await WriteAsync(ctx, 200, JsonSerializer.Serialize(orders, PictureJson.Options));
     }
@@ -149,7 +174,7 @@ static async Task HandleAsync(HttpListenerContext ctx, OpenRouterClient client, 
     {
         // Never take the sidecar down over one bad cycle - the mod treats a failed
         // request as "no orders" and simply tries again next tick.
-        Console.Error.WriteLine($"  ! {ex.Message}");
+        lock (Log.Gate) Console.Error.WriteLine($"  ! [{picture?.TaskforceName ?? "?"}] {ex.Message}");
         try { await WriteAsync(ctx, 500, "{\"error\":\"decision failed\"}"); } catch { /* client gone */ }
     }
 }
@@ -178,4 +203,17 @@ sealed class TeeWriter : TextWriter
     public override void Write(string? value) { _a.Write(value); _b.Write(value); }
     public override void WriteLine(string? value) { _a.WriteLine(value); _b.WriteLine(value); }
     public override void Flush() { _a.Flush(); _b.Flush(); }
+}
+
+/// <summary>
+/// Serialises the one-block-per-decision writes in HandleAsync. A plain local will not do:
+/// top-level statements cannot declare a static field, and the static local function
+/// HandleAsync cannot capture a non-static local.
+///
+/// This is the ONLY lock the sidecar needs. The mod already allows one decision in flight
+/// per task force, and spend is bounded by its own rate gate.
+/// </summary>
+static class Log
+{
+    public static readonly object Gate = new object();
 }

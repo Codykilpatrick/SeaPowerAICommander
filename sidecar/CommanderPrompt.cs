@@ -289,6 +289,11 @@ public static class CommanderPrompt
         your sensor picture, ASW to hunt submarines. Order the carrier or airbase, not the
         aircraft.
 
+        ONE ORDER LAUNCHES ONE AIRCRAFT. Set salvo to how many you want up - fighters and
+        ASW aircraft work in pairs, and a single fighter on CAP has nobody covering it and
+        dies alone. Use 2 for CAP, Intercept and ASW unless the deck is nearly empty. One
+        is fine for AEW, Recon and MPA - those are sensors, not a fight.
+
         aircraftAboard on each own unit lists what that deck actually holds - type, how
         many, and what roles it is fitted for. A unit without the field has no flight deck.
 
@@ -335,6 +340,18 @@ public static class CommanderPrompt
 
         Radiate does NOT restore active sonar. Pinging is a louder decision than a search
         radar and is left to the tactical AI.
+
+        YOUR AIRCRAFT FLY DARK UNLESS YOU SAY OTHERWISE. This catches people out. A
+        fighter's radar is switched on by its own AI only once it is ALREADY engaging an
+        air contact - so on patrol, on transit, and on the way to an intercept it is
+        completely blind, sees nothing coming, and gets shot by something it never
+        detected. Its radar is the longest-ranged sensor in your force and it is off.
+
+        SetEmcon works on aircraft exactly as it does on ships. Check airSearchRadarOn on
+        your airborne units, and order Radiate on the ones that need to see: anything
+        flying CAP or an intercept, and anything you have sent to classify a contact. An
+        AEW aircraft is pointless silent - that is its entire job. Keep a strike package
+        dark if you want it to arrive unnoticed, but know that is the trade you are making.
 
         WHAT YOU CANNOT ORDER
 
