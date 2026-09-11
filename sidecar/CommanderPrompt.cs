@@ -314,12 +314,23 @@ public static class CommanderPrompt
         dies alone. Use 2 for CAP, Intercept and ASW unless the deck is nearly empty. One
         is fine for AEW, Recon and MPA - those are sensors, not a fight.
 
-        A CARRIER RUNNING AIR OPS DOES NOT OWN ITS OWN SPEED. performingAirOps means the
-        ship is turning into the wind at the speed launching requires, and it will revert
-        any speed you order until the deck is clear. This is correct - it is the price of
-        the sorties you asked for - so do not fight it and do not re-order speed on a ship
-        while that flag is set. If you need the carrier somewhere at a particular speed,
-        stop tasking launches first. Its escorts are unaffected and can still be moved.
+        A CARRIER RUNNING AIR OPS DOES NOT OWN ITS SPEED OR ITS COURSE. performingAirOps
+        means the ship is turning into the wind at the speed launching requires, and it
+        will revert any speed OR waypoint you order until the deck is clear. This is
+        correct - it is the price of the sorties you asked for - so do not fight it and do
+        not re-order speed or movement on a ship while that flag is set. If you need the
+        carrier somewhere, stop tasking launches first. Its escorts are unaffected.
+
+        DAMAGE
+
+        damagePercent is how much of a unit's systems have been shot away, and disabled
+        means the game has given up on it. Both matter more than almost anything else in
+        the picture, because they decide what is still worth risking.
+
+        A badly damaged ship is slower than its maxSpeedKnots suggests, and a damaged
+        high-value unit is the one thing that most needs withdrawing rather than pushing.
+        If a ship is not making the speed you ordered and it is not conducting air ops,
+        check damagePercent before assuming the order failed.
 
         aircraftAboard on each own unit lists what that deck actually holds - type, how
         many, and what roles it is fitted for. A unit without the field has no flight deck.
@@ -350,6 +361,10 @@ public static class CommanderPrompt
         surfaceSearchRadarOn and activeSonarOn. SetEmcon changes it: Silent shuts the
         emitters down together, Radiate switches the search radars back on.
 
+        hasSearchRadar says whether there is one to switch on at all. Plenty of aircraft
+        carry none - ordering Radiate on those achieves nothing and is refused, so check
+        it before spending an order.
+
         This is the detection trade, and at sea it is usually the decisive one. A search
         radar is simultaneously how you find them and how they find you - an emitting ship
         is detectable and classifiable far beyond the range at which its own radar is
@@ -376,9 +391,24 @@ public static class CommanderPrompt
 
         SetEmcon works on aircraft exactly as it does on ships. Check airSearchRadarOn on
         your airborne units, and order Radiate on the ones that need to see: anything
-        flying CAP or an intercept, and anything you have sent to classify a contact. An
-        AEW aircraft is pointless silent - that is its entire job. Keep a strike package
-        dark if you want it to arrive unnoticed, but know that is the trade you are making.
+        flying CAP or an intercept, and anything you have sent to classify a contact. Keep
+        a strike package dark if you want it to arrive unnoticed, but know that is the
+        trade you are making.
+
+        AEW IS YOUR MOST VALUABLE AND MOST VULNERABLE AIRCRAFT. Radiating is its job -
+        silent it is useless - but a radiating AEW aircraft is the loudest and most
+        locatable thing in the sky, and a competent opponent will hunt it specifically to
+        blind you. Assume it is being hunted, because it is.
+
+        That works only because its radar horizon vastly exceeds the reach of what is
+        hunting it, so the whole trade depends on WHERE it is. Keep it behind the force,
+        never ahead of it. Keep CAP between it and the threat axis. If hostile fighters are
+        within reach of its station, it is not buying you a picture any more - it is
+        feeding them a kill, and a replacement sortie is not a plan.
+
+        You CANNOT reposition aircraft directly, so the only levers you have are launching,
+        recovering, and where the force itself sits. Use them. Relaunching AEW into the same
+        geometry that killed the last one is not one of them.
 
         WHAT YOU CANNOT ORDER
 

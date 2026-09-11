@@ -258,6 +258,35 @@ namespace SeaPowerAICommander.Picture
         public bool ActiveSonarOn;
 
         /// <summary>
+        /// Whether a search radar is FITTED at all, which is a different question from
+        /// whether it is on.
+        ///
+        /// Without this, "radar off" and "has no radar" look identical, and a Yak-38 -
+        /// which carries neither - was ordered to Radiate twice before the executor's
+        /// refusal explained why.
+        /// </summary>
+        public bool HasSearchRadar;
+
+        /// <summary>
+        /// How badly hurt this unit is, 0-100.
+        ///
+        /// Summed integrity lost across every system, over the hull's damage capacity.
+        /// The commander was previously blind to damage entirely, which is worse than it
+        /// sounds: a carrier crawling at 6kt could be conducting flight operations, taking
+        /// a clamped speed order, or crippled, and there was no way to tell. It kept
+        /// ordering 15kt at it.
+        ///
+        /// A force cannot be commanded well without knowing which of its ships are still
+        /// worth risking - and a damaged high-value unit is the one thing that most needs
+        /// to be withdrawn rather than pushed.
+        /// </summary>
+        public float DamagePercent;
+
+        /// <summary>True when the game has marked this unit disabled - it is still afloat
+        /// and still yours, but it is not going to do anything useful.</summary>
+        public bool Disabled;
+
+        /// <summary>
         /// True while this ship is conducting flight operations.
         ///
         /// Its speed and heading are NOT yours while this is set. The vessel enters a

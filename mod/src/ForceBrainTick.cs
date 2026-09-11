@@ -586,6 +586,19 @@ namespace SeaPowerAICommander
                                 $"[verify] {unit.Name} ({unit.Id}): ordered MoveTo but is a formation follower - " +
                                 "movement comes from its leader, so the order likely had no effect");
                         }
+                        else if (unit.WaypointsRemaining == 0 && unit.PerformingAirOps)
+                        {
+                            // Air ops owns the carrier's COURSE as well as its speed - the
+                            // PerformingAirOps state takes the rudder to turn into the
+                            // wind. Same cause as the speed case below, and it needs the
+                            // same explanation or the commander keeps re-issuing movement
+                            // orders to a launching carrier.
+                            ignored++;
+                            Problem(picture,
+                                $"[verify] {unit.Name} ({unit.Id}): ordered MoveTo but it is CONDUCTING " +
+                                "FLIGHT OPERATIONS - course and speed belong to air ops until the deck is " +
+                                "clear, so do not re-order them");
+                        }
                         else if (unit.WaypointsRemaining == 0)
                         {
                             ignored++;

@@ -453,10 +453,23 @@ namespace SeaPowerAICommander.Orders
 
             if (launched > 0)
             {
+                // Deck state AFTER the calls, because "launching 1 of 1" turned out to
+                // mean "queued 1 of 1". Sixteen AEW sorties were reported launched in one
+                // battle and no AEW aircraft ever appeared in the task force - the
+                // ammunition gate (CanLaunchVehicle) would have returned false and been
+                // logged, so createLaunchTask succeeded and something after it did not.
+                //
+                // Two theories were wrong before this line existed. Aboard/queued counts
+                // are what distinguish "no airframe left" from "queued and never cycled",
+                // and neither was visible.
+                var aboardAfter = deck.TotalVehiclesOnBoard();
+                var tasksAfter = deck.FlightDeckTasks != null ? deck.FlightDeckTasks.Count : -1;
+
                 Plugin.Log.LogInfo(
                     $"[air] {unit.getName()} launching {launched} of {wanted} requested " +
                     $"{mission} sortie(s)" +
-                    (fellBackToAnyRole ? $" (no {role} airframe aboard - sent what there was)" : ""));
+                    (fellBackToAnyRole ? $" (no {role} airframe aboard - sent what there was)" : "") +
+                    $" [deck: {aboardAfter} aboard, {tasksAfter} task(s) queued]");
                 return true;
             }
 

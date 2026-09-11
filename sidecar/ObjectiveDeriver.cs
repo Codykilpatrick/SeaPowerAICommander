@@ -48,6 +48,11 @@ public static class ObjectiveDeriver
           and achieve nothing.
         - If the briefing is too thin to infer anything, give a general area-denial
           mission suited to the forces described.
+        - Units and platforms keep whose they are. Inverting the PERSPECTIVE does not
+          invert ownership: a submarine the briefing calls theirs is theirs, and a ship it
+          calls ours is ours. A commander was once told to hunt an Oscar SSGN that was its
+          own boat, because the briefing mentioned one and the side got flipped with the
+          rest of the reasoning.
         """;
 
     /// <summary>

@@ -280,11 +280,14 @@ namespace SeaPowerAICommander.Picture
                     MaxSpeedKnots = Finite(obj.MaxForwardSpeedInKnots),
                     SpeedKnots = Finite(obj.getVelocityInKnots()),
                     WeaponStatus = obj._weaponStatus.ToString(),
+                    DamagePercent = DamageFraction(obj),
+                    Disabled = obj.Disabled,
                     PerformingAirOps = obj._performingAirOps,
                     EmconSilent = obj.Emcon != null && obj.Emcon.Value,
                     AirSearchRadarOn = obj.IsAirSearchRadarsOn != null && obj.IsAirSearchRadarsOn.Value,
                     SurfaceSearchRadarOn = obj.IsSurfaceSearchRadarsOn != null && obj.IsSurfaceSearchRadarsOn.Value,
                     ActiveSonarOn = obj.IsActiveSonarsOn != null && obj.IsActiveSonarsOn.Value,
+                    HasSearchRadar = obj.HasAirSearchRadar() || obj.HasSurfaceSearchRadar(),
                     InFormation = obj.InFormation != null && obj.InFormation.Value,
                     IsFormationLeader = obj.IsFormationLeader,
                     ActsIndependentlyInFormation =
@@ -314,6 +317,26 @@ namespace SeaPowerAICommander.Picture
         /// ignored. It cost three false "order did not take" warnings before the cause was
         /// clear.
         /// </summary>
+        /// <summary>
+        /// Damage as a percentage of the hull's capacity.
+        ///
+        /// ObjectBase._overallDamage is recomputed every update as the summed integrity
+        /// LOST across every system, so it is an absolute figure and means nothing without
+        /// its denominator - _totalDamagePoints, loaded from the hull's damagePoints.
+        /// Reporting the raw number would have handed the commander a quantity it could
+        /// not interpret, which is how the reach fields went unused for a whole session.
+        /// </summary>
+        private static float DamageFraction(ObjectBase obj)
+        {
+            var capacity = obj._totalDamagePoints;
+            if (capacity <= 0f) return 0f;
+
+            var pct = obj._overallDamage / capacity * 100f;
+            if (pct < 0f) pct = 0f;
+            if (pct > 100f) pct = 100f;
+            return Finite(pct);
+        }
+
         /// <summary>
         /// What is on the flight deck, for the units that have one.
         ///
