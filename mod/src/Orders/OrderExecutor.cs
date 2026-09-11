@@ -148,12 +148,33 @@ namespace SeaPowerAICommander.Orders
                 case ForceOrderKind.LaunchAirstrike:
                     return LaunchAirstrike(unit, order);
 
+                case ForceOrderKind.SetEmcon:
+                    return SetEmcon(unit, order);
+
                 default:
                     Plugin.Log.LogWarning($"[orders] unknown kind {order.Kind}");
                     return false;
             }
         }
 
+        /// <summary>
+        /// Reposition a surface or sub-surface unit.
+        ///
+        /// AIR UNITS ARE REFUSED, and that is a correction rather than a limitation newly
+        /// imposed. The waypoint was always being written and always being thrown away:
+        /// an aircraft under any of its own AI states - MPA, CAP, Intercept, AEW - rebuilds
+        /// its route every tick from SetRelativeToStationWaypointTask, relative to its
+        /// formation station rather than to the world. Ours survived until the next tick.
+        ///
+        /// Reporting that as applied was the actual damage. The commander spent cycles and
+        /// money re-issuing orders that could not work, then reasoned its way to a false
+        /// belief about itself - "MoveTo orders ineffective for aircraft", "cannot directly
+        /// control airborne aircraft" - and started planning around a limitation it had
+        /// inferred rather than been told.
+        ///
+        /// Redirecting aircraft properly means moving the station or retasking, which is a
+        /// feature and not a fix. Until then, refusing loudly beats pretending.
+        /// </summary>
         private static bool MoveTo(ObjectBase unit, ForceOrder order)
         {
             if (order.Latitude < -90.0 || order.Latitude > 90.0 ||
@@ -163,11 +184,71 @@ namespace SeaPowerAICommander.Orders
                 return false;
             }
 
+            if (unit is Aircraft || unit is Helicopter)
+            {
+                Plugin.Log.LogWarning(
+                    $"[orders] MoveTo refused for air unit {unit.getName()} ({unit.UniqueID}): " +
+                    "aircraft fly their tasking, not waypoints - their AI state rewrites the " +
+                    "route every tick. Retask or reposition the parent instead.");
+                return false;
+            }
+
             unit.RemoveWaypoints();
             unit.setWaypointTask(
                 new GeoPosition(order.Latitude, order.Longitude),
                 "ai-commander",
                 WaypointData.WaypointHeightState.NoChange);
+            return true;
+        }
+
+        /// <summary>
+        /// Go silent, or start radiating.
+        ///
+        /// The two directions are NOT symmetrical, and the game is the reason. setEMCON
+        /// (true) shuts down search radars, active sonar, offensive jamming, towed active
+        /// arrays and decoys together. setEMCON(false) only clears the flag - it turns
+        /// nothing back on - and CheckEMCON then recomputes the flag from whether anything
+        /// is actually radiating, so a bare setEMCON(false) is undone within a tick.
+        ///
+        /// Radiate therefore switches the search radars back on explicitly, which is also
+        /// what a force-level order should mean. Active sonar is deliberately NOT restored:
+        /// pinging is a much louder decision than turning on a search radar, it is usually
+        /// the tactical AI's call in a prosecution, and quietly starting it on a whole task
+        /// force because someone asked for "radiate" is not what anyone meant.
+        /// </summary>
+        private static bool SetEmcon(ObjectBase unit, ForceOrder order)
+        {
+            var want = (order.Emcon ?? "").Trim();
+
+            if (want.Equals("Silent", StringComparison.OrdinalIgnoreCase))
+            {
+                unit.setEMCON(true);
+                return true;
+            }
+
+            if (!want.Equals("Radiate", StringComparison.OrdinalIgnoreCase))
+            {
+                Plugin.Log.LogWarning(
+                    $"[orders] SetEmcon for {unit.getName()}: unrecognised state '{order.Emcon}' " +
+                    "(expected Silent or Radiate)");
+                return false;
+            }
+
+            // Only what the unit actually has - asking a minesweeper for air search is a
+            // no-op at best and a log full of noise at worst.
+            var lit = false;
+            if (unit.HasAirSearchRadar())     { unit.EnableAirSearchRadars();     lit = true; }
+            if (unit.HasSurfaceSearchRadar()) { unit.EnableSurfaceSearchRadars(); lit = true; }
+
+            if (!lit)
+            {
+                Plugin.Log.LogInfo(
+                    $"[orders] SetEmcon Radiate for {unit.getName()}: no search radar fitted, nothing to switch on.");
+                return false;
+            }
+
+            // Leave the flag to CheckEMCON - it derives Emcon from what is actually
+            // radiating, and setting it here would only be overwritten anyway.
             return true;
         }
 

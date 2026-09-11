@@ -241,6 +241,23 @@ namespace SeaPowerAICommander.Picture
         public string WeaponStatus;
 
         /// <summary>
+        /// True when this unit is emitting nothing - the game's own EMCON flag, which it
+        /// derives from whether any radar, active sonar or jammer is actually on.
+        ///
+        /// Carried because emission control decides who detects whom, and the commander
+        /// was previously blind to it: it could not tell a ship that had gone quiet from
+        /// one whose radar had been switched off by its own tactical AI, and wrote plans
+        /// around a sensor picture whose cause it could not see.
+        /// </summary>
+        public bool EmconSilent;
+
+        /// <summary>Which emitters are actually radiating. Separate from
+        /// <see cref="EmconSilent"/> so a partially-silent unit is legible.</summary>
+        public bool AirSearchRadarOn;
+        public bool SurfaceSearchRadarOn;
+        public bool ActiveSonarOn;
+
+        /// <summary>
         /// True when this unit is stationed in a formation.
         ///
         /// A formation follower takes its movement from the leader, so a MoveTo aimed at

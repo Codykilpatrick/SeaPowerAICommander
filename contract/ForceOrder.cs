@@ -66,6 +66,24 @@ namespace SeaPowerAICommander.Orders
         /// picture does not hold.
         /// </summary>
         LaunchAirstrike,
+
+        /// <summary>
+        /// Go silent, or start radiating.
+        ///
+        /// Emission control was the largest hole in the action space: the commander could
+        /// neither see whether its ships were radiating nor decide it. In a GIUK
+        /// interception that is most of the problem - the side that finds the other first
+        /// shoots first, and a radiating search radar is both the way you find them and
+        /// the way they find you. Both commanders spent that battle complaining they could
+        /// not classify anything while the levers that decide detection sat outside their
+        /// reach entirely.
+        ///
+        /// Coarse on purpose. "Silent" runs the game's own EMCON, shutting down search
+        /// radars, active sonar and offensive jamming together; "Radiate" turns the search
+        /// radars back on. Choosing individual emitters is a tactical-AI job, not a
+        /// force-level one.
+        /// </summary>
+        SetEmcon,
     }
 
     public static class ForceOrderKinds
@@ -99,6 +117,7 @@ namespace SeaPowerAICommander.Orders
                 case ForceOrderKind.CoordinatedAttack:
                 case ForceOrderKind.Disengage:
                 case ForceOrderKind.LaunchAirstrike:
+                case ForceOrderKind.SetEmcon:
                     return false;
 
                 default:
@@ -143,6 +162,9 @@ namespace SeaPowerAICommander.Orders
         /// SEAD suppresses air defences; Jam is electronic attack.
         /// </summary>
         public string StrikeType;
+
+        /// <summary>SetEmcon only: "Silent" | "Radiate".</summary>
+        public string Emcon;
 
         /// <summary>Free text for the log. Useful when a brain should explain itself.</summary>
         public string Reason;

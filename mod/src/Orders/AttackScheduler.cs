@@ -132,10 +132,25 @@ namespace SeaPowerAICommander.Orders
             }
         }
 
+        private const float KnotsToMetresPerSecond = 0.514444f;
+
         /// <summary>
         /// Rough time of flight for the longest-reaching weapon this unit carries against
         /// that target. Straight-line range over nominal weapon speed - good enough to
         /// order releases, which is all it is used for.
+        ///
+        /// SPEED COMES FROM MaxVelocity, NOT MuzzleVelocity. For a gun those are the same
+        /// number; for a missile they are not remotely. Muzzle velocity is the booster or
+        /// ejection speed it leaves the launcher at, and a cruise missile spends its whole
+        /// flight at the sustainer speed instead.
+        ///
+        /// Reading the wrong one cost a battle. A Tomahawk shot at a Kirov 223nm away was
+        /// estimated at 5338s of flight - 89 minutes, an implied 77 m/s - so the scheduler
+        /// dutifully held the P-3C's Harpoons back by 89 game-minutes to make them "arrive
+        /// together". The saturation strike went in as a single unsupported salvo, the
+        /// Kirov survived it, and the log cheerfully reported a coordinated attack the
+        /// whole time. The game's own ini default for MaxVelocity is 540 knots, and the
+        /// game computes its own _timeToMaxRange from that same field.
         /// </summary>
         private static float EstimateTimeOfFlightSeconds(ObjectBase unit, ObjectBase target)
         {
@@ -150,7 +165,12 @@ namespace SeaPowerAICommander.Orders
                     foreach (var a in ammo)
                     {
                         if (a == null || a._ap == null) continue;
-                        var speed = a._ap._muzzleVelocityInMeterPerSecond;
+
+                        // Cruise/sustainer speed first, launch speed only as a fallback -
+                        // a gun round has no MaxVelocity and its muzzle figure is correct.
+                        var speed = a._ap._maxVelocityInKnots * KnotsToMetresPerSecond;
+                        if (speed <= 1f) speed = a._ap._muzzleVelocityInMeterPerSecond;
+
                         if (speed > fastest) fastest = speed;
                     }
                 }

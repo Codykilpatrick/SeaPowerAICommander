@@ -29,7 +29,7 @@ public static class OrderSchema
                 {
                     ["type"] = "string",
                     ["enum"] = kinds,
-                    ["description"] = "The order type. MoveTo steers to a position, SetSpeed sets speed in knots, SetWeaponStatus sets Tight/Free/Hold.",
+                    ["description"] = "The order type. MoveTo steers a SURFACE OR SUBSURFACE unit to a position (air units are refused - they fly their tasking), SetSpeed sets speed in knots, SetWeaponStatus sets Tight/Free/Hold, SetEmcon goes Silent or Radiate.",
                 },
                 ["unitId"] = new JsonObject
                 {
@@ -78,6 +78,12 @@ public static class OrderSchema
                     ["type"] = "string",
                     ["description"] = "CoordinatedAttack only. A label shared by every unit in one simultaneous attack, e.g. \"strike-alpha\". Their releases are timed so the weapons arrive together. Use \"\" for other order kinds.",
                 },
+                ["emcon"] = new JsonObject
+                {
+                    ["type"] = "string",
+                    ["enum"] = new JsonArray("Silent", "Radiate"),
+                    ["description"] = "SetEmcon only. \"Silent\" shuts down search radars, active sonar and jamming together; \"Radiate\" switches the search radars back on. Use \"Radiate\" for other order kinds.",
+                },
                 ["reason"] = new JsonObject
                 {
                     ["type"] = "string",
@@ -88,7 +94,7 @@ public static class OrderSchema
             // "use 0 / use Tight" notes above for fields a given kind ignores.
             ["required"] = new JsonArray(
                 "kind", "unitId", "latitude", "longitude", "speedKnots", "weaponStatus",
-                "targetContactId", "salvo", "coordinationGroup", "strikeType", "reason"),
+                "targetContactId", "salvo", "coordinationGroup", "strikeType", "emcon", "reason"),
             ["additionalProperties"] = false,
         };
 

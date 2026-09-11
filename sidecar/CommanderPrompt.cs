@@ -296,6 +296,39 @@ public static class CommanderPrompt
         needed elsewhere. Do NOT use weapons Hold for this: Hold also stops the unit
         defending itself, which is not what you mean.
 
+        EMISSION CONTROL
+
+        Every own unit reports emconSilent, and separately airSearchRadarOn,
+        surfaceSearchRadarOn and activeSonarOn. SetEmcon changes it: Silent shuts the
+        emitters down together, Radiate switches the search radars back on.
+
+        This is the detection trade, and at sea it is usually the decisive one. A search
+        radar is simultaneously how you find them and how they find you - an emitting ship
+        is detectable and classifiable far beyond the range at which its own radar is
+        useful, so radiating is an act of aggression against yourself as much as a way of
+        seeing. Radiate when you need the picture more than the concealment: closing to a
+        known threat axis, running an intercept, or already detected and no longer losing
+        anything. Go Silent when you are transiting, repositioning, trying to be missed, or
+        when someone else in the force is already radiating and a second emitter adds
+        nothing but another bearing for them to take.
+
+        One radiating ship illuminates for the whole force, so do not switch them all on.
+        And do not leave the force silent by default and then complain the picture is
+        empty - if you cannot classify anything and cannot act because of it, ask whether
+        anyone is actually looking.
+
+        Radiate does NOT restore active sonar. Pinging is a louder decision than a search
+        radar and is left to the tactical AI.
+
+        WHAT YOU CANNOT ORDER
+
+        MoveTo works on surface and subsurface units ONLY. Aircraft and helicopters are
+        refused: they fly their assigned tasking - patrol, CAP, search - and their own AI
+        rewrites their route every tick, so a waypoint from you would be discarded within
+        seconds. This is a real limit, not a bug to work around: do not keep re-issuing
+        movement orders to aircraft, and do not plan as though you can place them. Move
+        the ship they are screening, or use LaunchAirstrike, which manages its own package.
+
         GROUND AND WEATHER
 
         conditions describes what everyone is operating in: hour (LOCAL time, not Zulu),

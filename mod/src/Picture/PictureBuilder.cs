@@ -280,6 +280,10 @@ namespace SeaPowerAICommander.Picture
                     MaxSpeedKnots = Finite(obj.MaxForwardSpeedInKnots),
                     SpeedKnots = Finite(obj.getVelocityInKnots()),
                     WeaponStatus = obj._weaponStatus.ToString(),
+                    EmconSilent = obj.Emcon != null && obj.Emcon.Value,
+                    AirSearchRadarOn = obj.IsAirSearchRadarsOn != null && obj.IsAirSearchRadarsOn.Value,
+                    SurfaceSearchRadarOn = obj.IsSurfaceSearchRadarsOn != null && obj.IsSurfaceSearchRadarsOn.Value,
+                    ActiveSonarOn = obj.IsActiveSonarsOn != null && obj.IsActiveSonarsOn.Value,
                     InFormation = obj.InFormation != null && obj.InFormation.Value,
                     IsFormationLeader = obj.IsFormationLeader,
                     ActsIndependentlyInFormation =
