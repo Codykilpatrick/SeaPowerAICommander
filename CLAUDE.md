@@ -300,6 +300,38 @@ post-mortem.
 Prefer reusing an existing field to adding a fifth. `salvo` already means "how many" and
 is wired through all four places.
 
+## Start every session by reading both logs
+
+Before anything else, look at what the last run did — and if a mission is running now, arm a
+watch rather than checking back by hand. Neither log survives in anyone's memory between
+sessions, and every real bug in this repo so far was found by reading one of them rather
+than by reasoning about the code.
+
+**The sidecar log** — `sidecar/bin/Debug/net8.0/logs/sidecar-*.log`, newest by mtime. This is
+the commander's side: the derived or restated objective, each cycle's assessment, the orders
+with their reasons, token counts and decision latency. Read the objective line first. It says
+`(own briefing)` or `(Enemy)`, and getting that wrong means everything below it is arguing
+for the wrong outcome.
+
+**The game log** — `BepInEx/LogOutput.log` under the Sea Power install. This is the
+executor's side: what was accepted, refused, verified, scheduled and released. It is **not**
+truncated between runs and it contains NUL bytes, so find the last `booted` line and scope to
+it, and pass `-a` / `tr -d '\000'` or grep reports it as a binary file:
+
+```bash
+L="/c/Program Files (x86)/Steam/steamapps/common/Sea Power/BepInEx/LogOutput.log"
+awk "NR>=$(grep -an 'booted' "$L" | tail -1 | cut -d: -f1)" "$L" | tr -d '\000' | grep -aE '\[order\]|\[verify\]|\[diag\]|\[attack\]'
+```
+
+Reading one without the other is how a wrong conclusion survives. The commander's assessment
+says what it believed; the game log says what actually happened. A whole evening went into
+"why won't the F-14s take an identify order" when the game log had them reaching
+`IdentifySurfaceContact` two cycles later — the sidecar log alone showed only the reissues.
+
+While a mission is live, tail the game log filtered to the lines worth acting on, and let it
+notify you. Polling it by hand between messages misses the window in which a decision can
+still be changed.
+
 ## Testing
 
 **There is no test suite.** Verification is a build plus a live mission. When you change
