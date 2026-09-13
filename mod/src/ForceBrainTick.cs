@@ -816,6 +816,16 @@ namespace SeaPowerAICommander
                 case ForceOrderKind.SetFormation:
                     return 180f;
 
+                // Not the instant flag it looks like. setEMCON writes Emcon immediately, but
+                // the fields worth checking are the per-sensor ones, and those only become
+                // true once the radar is actually running and CheckEMCON has seen it. A
+                // P-3C ordered to radiate read emconSilent=false with every radar still off
+                // for a full cycle, then surfaceSearchRadarOn=true on the next - so this
+                // check shipped with a grace of zero and immediately produced exactly the
+                // false report the grace mechanism exists to prevent.
+                case ForceOrderKind.SetEmcon:
+                    return 90f;
+
                 // Everything else is a flag or a setpoint and takes effect on the tick.
                 default:
                     return 0f;
@@ -846,6 +856,7 @@ namespace SeaPowerAICommander
 
             var ignored = 0;
             var settling = 0;
+            var retire = new List<string>();
 
             foreach (var order in picture.StandingOrders)
             {
@@ -980,10 +991,15 @@ namespace SeaPowerAICommander
                         }
                         else if (!wantSilent && !radiating)
                         {
+                            // Deliberately does NOT guess at a cause. The executor already
+                            // refuses Radiate on a unit with no search radar, so "it may have
+                            // no radar to switch on" was a suggestion the picture contradicted
+                            // in the same breath - hasSearchRadar was true on both aircraft it
+                            // was printed against.
                             ignored++;
                             Problem(picture,
-                                $"[verify] {unit.Name} ({unit.Id}): ordered EMCON Radiate but nothing is " +
-                                "emitting - it may have no search radar to switch on.");
+                                $"[verify] {unit.Name} ({unit.Id}): ordered EMCON Radiate but no radar " +
+                                "is reading as on. It carries one, so something is keeping it off.");
                         }
 
                         break;
@@ -1047,6 +1063,15 @@ namespace SeaPowerAICommander
                         // is indistinguishable from a finished attack unless we ask.
                         if (AttackScheduler.HasPending(order.UnitId, order.TargetContactId)) break;
 
+                        // Say it once and retire it. A finished attack is not a standing
+                        // order, and leaving it standing meant re-reporting the same
+                        // completed strike every cycle for the rest of the battle - two
+                        // shooters and two Yak-38s were still being announced as "no longer
+                        // engaging" cycles after the fact. orderProblems is where genuine
+                        // failures are supposed to be visible, and permanent entries that
+                        // describe something working are exactly what stops it being read.
+                        retire.Add(order.UnitId + ":" + order.Kind);
+
                         ignored++;
                         Problem(picture,
                             $"[verify] {unit.Name} ({unit.Id}): ordered to attack contact " +
@@ -1061,9 +1086,17 @@ namespace SeaPowerAICommander
                 }
             }
 
+            foreach (var key in retire)
+            {
+                state.StandingOrders.Remove(key);
+                state.OrderIssuedAt.Remove(key);
+            }
+
             Plugin.Log.LogInfo(
                 $"[verify] {picture.TaskforceName}: {picture.StandingOrders.Count} standing, " +
-                $"{ignored} not reflected in unit state");
+                $"{ignored} not reflected in unit state" +
+                (settling > 0 ? $", {settling} still settling" : "") +
+                (retire.Count > 0 ? $", {retire.Count} completed attack(s) retired" : ""));
         }
     }
 }
