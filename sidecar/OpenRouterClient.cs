@@ -50,6 +50,36 @@ public sealed class OpenRouterClient : IDisposable
     }
 
     /// <summary>
+    /// The system message, marked as a cache breakpoint.
+    ///
+    /// THE COMMANDER PROMPT IS BYTE-IDENTICAL ON EVERY CALL AND WAS BEING RE-BILLED IN FULL
+    /// EVERY TIME. Roughly 34,000 input tokens a decision, with prompt_tokens_details
+    /// reporting 0 cached on all of them - across two task forces, one decision each per
+    /// tick, for a whole battle.
+    ///
+    /// Caching needs the content sent as blocks rather than a bare string, so the prefix can
+    /// be marked; a plain string has nowhere to hang cache_control. The breakpoint goes on
+    /// the LAST cacheable block, and everything before it is what gets reused - so the system
+    /// prompt caches and the picture, which is different every cycle, does not and should
+    /// not.
+    ///
+    /// This is also the reason not to reach for the prompt's length first when worrying about
+    /// cost. Trimming prose saves the tokens once; caching saves nearly all of them on every
+    /// call after the first, and costs none of the guidance.
+    /// </summary>
+    private static JsonObject CachedSystemMessage(string system) => new JsonObject
+    {
+        ["role"] = "system",
+        ["content"] = new JsonArray(
+            new JsonObject
+            {
+                ["type"] = "text",
+                ["text"] = system,
+                ["cache_control"] = new JsonObject { ["type"] = "ephemeral" },
+            }),
+    };
+
+    /// <summary>
     /// A plain question with no schema, used for the one-off objective derivation.
     /// </summary>
     public async Task<string> AskAsync(string system, string user, CancellationToken ct)
@@ -84,7 +114,7 @@ public sealed class OpenRouterClient : IDisposable
         {
             ["model"] = _model,
             ["messages"] = new JsonArray(
-                new JsonObject { ["role"] = "system", ["content"] = CommanderPrompt.System },
+                CachedSystemMessage(CommanderPrompt.System),
                 new JsonObject { ["role"] = "user", ["content"] = CommanderPrompt.BuildUserMessage(picture) }),
             // Usage accounting is opt-in on OpenRouter. Without it we cannot tell a slow
             // decision caused by a large picture from one caused by long reasoning.
