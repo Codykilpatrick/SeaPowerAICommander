@@ -307,6 +307,7 @@ namespace SeaPowerAICommander.Picture
                 ApplyCurrentOrder(unit, obj);
                 ApplyWeaponTypes(unit, obj);
                 ApplyAiState(unit, obj);
+                ApplyAlert(unit, obj);
                 ApplyEngagements(unit, obj);
 
                 picture.OwnUnits.Add(unit);
@@ -644,6 +645,24 @@ namespace SeaPowerAICommander.Picture
         /// DIAGNOSTIC - see OwnUnit.AiState. Cheap: one enum-ish string per unit, and the
         /// game computes it as a GetType().Name on a field it already holds.
         /// </summary>
+        /// <summary>
+        /// Whether this unit's AI has gone to alert - the single flag that decides whether
+        /// an EMCON or weapon-status order will survive the next tick.
+        /// </summary>
+        private static void ApplyAlert(OwnUnit unit, ObjectBase obj)
+        {
+            try
+            {
+                if (obj._ai == null) return;
+
+                unit.OnAlert = obj._ai._onAlert;
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.LogWarning($"[picture] alert state unreadable for {unit.Name}: {ex.Message}");
+            }
+        }
+
         private static void ApplyAiState(OwnUnit unit, ObjectBase obj)
         {
             try
@@ -807,6 +826,7 @@ namespace SeaPowerAICommander.Picture
 
                 var best = float.MaxValue;
                 var bestId = 0;
+                System.Text.StringBuilder bases = null;
 
                 for (int i = 0; i < picture.OwnUnits.Count; i++)
                 {
@@ -831,7 +851,21 @@ namespace SeaPowerAICommander.Picture
                         contact.UnitsInReach ??= new List<int>();
                         contact.UnitsInReach.Add(u.Id);
                     }
+
+                    // An airbase's distance to a target is the one range that matters for a
+                    // strike and the one no other field carries, because every other range
+                    // here is measured from the fleet and the base does not move with it.
+                    if (u.CanMountAirstrike)
+                    {
+                        if (bases == null) bases = new System.Text.StringBuilder();
+                        else bases.Append(", ");
+
+                        bases.Append(u.Name).Append(" (").Append(u.Id).Append(") ")
+                             .Append(nm.ToString("F0")).Append("nm");
+                    }
                 }
+
+                if (bases != null) contact.AirstrikeBaseRanges = bases.ToString();
 
                 if (bestId == 0) return;
 

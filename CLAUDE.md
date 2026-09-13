@@ -121,6 +121,7 @@ there is **no single fix** — each wants a different answer:
 | Aircraft AI states (`MPA`/`CAP`/`Intercept`/`AEW`) | waypoints wiped; routes rebuilt from `SetRelativeToStationWaypointTask` | **refuse** — `MoveTo` is rejected for air units |
 | `Vessel` `PerformingAirOps` | launching carrier ignores speed AND course | **report it** — the game is right; say so and don't fight it |
 | `Winchester` | non-player aircraft drops to Hold | **nothing** — it is out of ordnance, which the reach fields already show as 0 |
+| `AI.CheckForRaiseAlert` | an AI-side unit reverts EMCON Silent **and** weapons Tight, together, the moment it holds a threat — and so does everything within 10nm and every ship in its formation | **report it** — `OnAlert` in the picture; the game is right that a warship holding a threat should look and shoot, and concealment is a pre-contact option only |
 | Submarine AI states (`Drift`/`Sprint`/`ClassifyContact`/…) | boat re-picks its depth band | **accept and report** — each state calls `setPresetDepth` on *entry*, not per tick, so an ordered band holds until the next state change; the verify pass says when it went |
 
 Two traps worth naming:

@@ -446,6 +446,27 @@ namespace SeaPowerAICommander.Picture
         public bool CanMountAirstrike;
 
         /// <summary>
+        /// True when this unit's own AI has gone to alert, which OVERRIDES BOTH EMCON AND
+        /// WEAPON STATUS and is not something an order can hold back.
+        ///
+        /// `AI.CheckForRaiseAlert` calls `EnableAllActiveSensors()` and sets weapons Free
+        /// together (`AI.cs:3526-3532`), and it is raised for every unit within 10nm of the
+        /// one that made the detection, and again across a whole formation. So a force that
+        /// has been found cannot be kept quiet: order it silent and tight and the next alert
+        /// puts the radars back on and the weapons back to Free.
+        ///
+        /// It applies to AI-side forces only - `ObjectBase.cs:2717` raises it solely when
+        /// the task force is not the player's - which is why a delegated player fleet can
+        /// hold EMCON through contact and an enemy one cannot.
+        ///
+        /// Reported rather than fought, because the game is right: a warship holding a
+        /// threat should be looking and should be free to shoot. What was wrong was a
+        /// commander building a concealment plan around Kirov and Minsk, having both halves
+        /// of it quietly reversed, and being told only that its order "did not take".
+        /// </summary>
+        public bool OnAlert;
+
+        /// <summary>
         /// True when this unit is stationed in a formation.
         ///
         /// A formation follower takes its movement from the leader, so a MoveTo aimed at
@@ -667,6 +688,29 @@ namespace SeaPowerAICommander.Picture
         /// plausible shooters, not a firing solution.
         /// </summary>
         public List<int> UnitsInReach;
+
+        /// <summary>
+        /// Distance to this contact from each of your units that can raise an air strike -
+        /// "Andersen AFB (1) 317nm". Null when you have no such unit.
+        ///
+        /// THE OTHER RANGE FIELDS ARE ALL MEASURED FROM THE WRONG PLACE FOR THIS DECISION.
+        /// RangeFromNearestUnitNM and RangeFromForceNM follow the fleet, and an airbase does
+        /// not: Andersen sat on Guam 317nm from the Soviet force while the contact reported
+        /// 105nm from the nearest frigate and 134nm from the force centre. Neither number
+        /// had anything to do with whether a strike could reach, and working it out from raw
+        /// latitude and longitude is not something to ask of a commander mid-battle.
+        ///
+        /// So the base flew nothing for a second mission running - the first time because
+        /// unitsInReach omitted it, and the second because it had been told it COULD strike
+        /// and given no way to tell whether this particular target was in range.
+        ///
+        /// This is a measured distance and not a reachability verdict, which is the
+        /// distinction that matters: nothing in the game's strike pipeline compares base to
+        /// target, so whether that distance is flyable still depends on the airframe and is
+        /// still the commander's call. Reporting the number is not the same as inventing a
+        /// radius for it.
+        /// </summary>
+        public string AirstrikeBaseRanges;
 
         /// <summary>
         /// Highest terrain in metres on the bearing from the force centre to this contact.

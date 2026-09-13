@@ -362,9 +362,18 @@ public static class CommanderPrompt
         their magazines dry at one contact.
 
         The game does not check whether a strike can reach its target. The aircraft launch,
-        fly, and go bingo on fuel if it was too far, so the distance judgement is YOURS:
-        compare the contact's range against the sort of radius that airframe plausibly has,
-        and do not send a strike across an ocean.
+        fly, and go bingo on fuel if it was too far, so the distance judgement is YOURS -
+        and airstrikeBaseRanges on the contact is the number to make it with. It gives the
+        distance from each of your strike-capable units to that contact, which is the ONLY
+        range field measured from the base: rangeFromNearestUnitNM and rangeFromForceNM both
+        follow the fleet, and an airfield does not move with the fleet. An airbase 317nm
+        from a target sat out a battle beside a contact reporting 105nm, because that 105nm
+        was measured from a frigate.
+
+        Read airstrikeBaseRanges, then judge it against the airframes in aircraftAboard. A
+        strike aircraft of this era reaches a few hundred miles and a heavy bomber very much
+        further; a few hundred miles is a normal sortie, not a stretch. Do not talk yourself
+        out of a strike you can make, and do not send one across an ocean.
 
         AND WHICH REACH. A unit's three reach figures count only ordnance it still HAS, so
         a zero is not an incapable platform - it is an empty one. airDefenceReachNM of 0 on
@@ -496,6 +505,23 @@ public static class CommanderPrompt
         hasSearchRadar says whether there is one to switch on at all. Plenty of aircraft
         carry none - ordering Radiate on those achieves nothing and is refused, so check
         it before spending an order.
+
+        onAlert ENDS THE ARGUMENT, AND IT IS THE FIRST FIELD TO READ BEFORE PLANNING ANY
+        CONCEALMENT. A unit that goes to alert switches every active sensor on and sets its
+        weapons Free, in one action, and it goes to alert as soon as it holds a threat -
+        along with everything within 10nm of it and every other ship in its formation. An
+        order cannot hold that back. Order such a unit Silent and Tight and it will be
+        radiating and Free again immediately, and reissuing changes nothing.
+
+        So concealment is a PRE-CONTACT option. Decide about EMCON while you are still
+        unseen and unthreatened; once your force is holding threats, its emissions are no
+        longer yours to command and the only way back to quiet is to break contact.
+
+        Do not plan around hiding a capital ship inside a screen that is already in action.
+        A commander did exactly that - Kirov and Minsk silent and weapons tight while the
+        escorts radiated and screened - and every part of it was reversed by alert while it
+        went on believing the plan was in force. If you want that shape, you have to be in
+        it before the shooting starts.
 
         This is the detection trade, and at sea it is usually the decisive one. A search
         radar is simultaneously how you find them and how they find you - an emitting ship

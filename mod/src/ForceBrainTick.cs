@@ -946,9 +946,48 @@ namespace SeaPowerAICommander
                             ignored++;
                             Problem(picture,
                                 $"[verify] {unit.Name} ({unit.Id}): ordered weapons {order.WeaponStatus} " +
-                                $"but posture is {unit.WeaponStatus} - order did not take");
+                                $"but posture is {unit.WeaponStatus}" +
+                                (unit.OnAlert
+                                    ? " - this unit is ON ALERT, and going to alert sets weapons Free " +
+                                      "and switches every active sensor on, together. You cannot hold a " +
+                                      "unit tight or silent once it is holding a threat, and reissuing " +
+                                      "will not change that. Break contact or accept the posture."
+                                    : " - order did not take"));
                         }
                         break;
+
+                    // There was no check here at all, which is how half of an override went
+                    // unseen for two missions. Alert switches the radars back on in the same
+                    // branch that sets weapons Free, so a commander whose concealment plan
+                    // had been reversed was told about the weapons and never about the
+                    // emissions - and went on believing its capital ships were dark.
+                    case ForceOrderKind.SetEmcon:
+                    {
+                        var wantSilent = string.Equals(order.Emcon, "Silent", StringComparison.OrdinalIgnoreCase);
+                        var radiating = unit.AirSearchRadarOn || unit.SurfaceSearchRadarOn || unit.ActiveSonarOn;
+
+                        if (wantSilent && radiating)
+                        {
+                            ignored++;
+                            Problem(picture,
+                                $"[verify] {unit.Name} ({unit.Id}): ordered EMCON Silent but it is still " +
+                                "radiating" +
+                                (unit.OnAlert
+                                    ? " - this unit is ON ALERT, which switches every active sensor back " +
+                                      "on and sets weapons Free together. Concealment is only available " +
+                                      "BEFORE contact; once it holds a threat you cannot order it quiet."
+                                    : " - order did not take"));
+                        }
+                        else if (!wantSilent && !radiating)
+                        {
+                            ignored++;
+                            Problem(picture,
+                                $"[verify] {unit.Name} ({unit.Id}): ordered EMCON Radiate but nothing is " +
+                                "emitting - it may have no search radar to switch on.");
+                        }
+
+                        break;
+                    }
 
                     case ForceOrderKind.SetDepth:
                         // The band a boat holds is re-picked by its own state machine every
@@ -1011,11 +1050,12 @@ namespace SeaPowerAICommander
                         ignored++;
                         Problem(picture,
                             $"[verify] {unit.Name} ({unit.Id}): ordered to attack contact " +
-                            $"{order.TargetContactId} and is no longer engaging it - the shots it was " +
-                            "going to take have been taken. This is what a completed attack looks " +
-                            "like, NOT a failed one, so do not reissue it expecting the first salvo " +
-                            "to have been missed. Order again only if you judge the target needs more " +
-                            "weapons than you have already sent it.");
+                            $"{order.TargetContactId} and is no longer engaging it - it has RELEASED " +
+                            "the shots it was going to take. This is what a completed launch looks " +
+                            "like, NOT a failed one. It says nothing about the result: weapons " +
+                            "released are very likely still in flight, and this contact's damage or " +
+                            "disappearance is the only thing that reports effect. Do not read this " +
+                            "as a miss and do not reissue to compensate for one.");
                         break;
 
                 }
