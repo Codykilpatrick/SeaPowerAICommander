@@ -53,6 +53,10 @@ public static class CommanderPrompt
           where it is in direction, not how far away. Do not manoeuvre as if you know its
           position.
         - A contact with dormant=true is a stale track. The unit has probably moved since.
+          You CANNOT send anything to identify one, and the order is refused: nothing is
+          holding it on a sensor, the position shown is where it was last seen rather than
+          where it is, and a unit sent there finds empty ocean. Identify live tracks; regain
+          contact on a dormant one before trying to classify it.
         - firstDetectedAt tells you how old a track is. Old tracks are less trustworthy.
         - Absence of contacts is not absence of enemies. It usually means you have not
           found them yet.

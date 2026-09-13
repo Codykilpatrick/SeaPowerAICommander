@@ -734,6 +734,20 @@ namespace SeaPowerAICommander.Orders
                 }
             }
 
+            // DIAGNOSTIC, and it exists because two strikes from a fully stocked airbase
+            // spent their entire 600-second assignment window finding zero aircraft - one
+            // forced to AntiShipHeavy, one to Strike, with the deck reporting F-4E x4 and
+            // B-52G x2 unchanged throughout. AssigningAircraft asks the deck the SAME
+            // question this line asks, with the same permissions, and got a different
+            // answer; nothing in either log says why, and reading the decompile settled
+            // neither. So ask it here, at the moment of the order, and print it.
+            //
+            // If these numbers are non-zero and the strike still assigns nothing, the deck
+            // changed its mind between our call and the state's. If they are zero, then
+            // Describe() is over-reporting and airstrikeLoadouts is lying to the commander.
+            // Either way the next run answers it instead of another round of inference.
+            LogDeckAvailability(unit, forced);
+
             var strike = BuildAirstrike(unit, target, type, forced);
             if (strike == null) return false;
 
@@ -759,6 +773,54 @@ namespace SeaPowerAICommander.Orders
         /// cooldown. It is private, it throttles the tactical AI's strikes rather than ours,
         /// and our cadence is already bounded by the tick interval and the rate gate.
         /// </summary>
+        /// <summary>
+        /// What the flight deck says it can offer, asked exactly as AssigningAircraft asks
+        /// it - same usage, same three size permissions, same defaults the strike runs with
+        /// (_allowLarge is set true by BuildAirstrike, _allowSmall and _allowVeryLarge are
+        /// true by field default). Any divergence from what the strike then finds is the
+        /// thing being hunted, so the call must not be paraphrased.
+        /// </summary>
+        private static void LogDeckAvailability(ObjectBase unit, string forced)
+        {
+            try
+            {
+                var line = new System.Text.StringBuilder();
+                line.Append("[diag] airstrike deck ").Append(unit.getName())
+                    .Append(" allowPartial=")
+                    .Append(unit._obp != null && unit._obp._flightDeck != null
+                        ? unit._obp._flightDeck._allowPartialAirstrikes.ToString()
+                        : "?")
+                    .Append(" forced=").Append(string.IsNullOrEmpty(forced) ? "(none)" : forced)
+                    .Append(" ->");
+
+                var names = AirstrikeLoadouts.Available(unit);
+                if (names == null || names.Count == 0)
+                {
+                    line.Append(" NOTHING AVAILABLE");
+                }
+                else
+                {
+                    foreach (var pair in names)
+                    {
+                        var entries = unit.FlightDeckGetUnitAndNumberForLoadout(
+                            pair.Key, VehicleTypeOnBoard.PermittedUsage.Airstrike, true, true, true);
+
+                        var total = 0;
+                        if (entries != null)
+                            foreach (var e in entries) total += e.Item2;
+
+                        line.Append(' ').Append(pair.Key).Append('=').Append(total);
+                    }
+                }
+
+                Plugin.Log.LogInfo(line.ToString());
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.LogWarning($"[diag] airstrike deck read failed for {unit.getName()}: {ex.Message}");
+            }
+        }
+
         private static AirStrike BuildAirstrike(
             ObjectBase unit, ObjectBase target, AirStrike.Type type, string forcedLoadout)
         {
@@ -847,6 +909,31 @@ namespace SeaPowerAICommander.Orders
             {
                 Plugin.Log.LogWarning(
                     $"[orders] IdentifyContact: contact {order.TargetContactId} is already identified");
+                return false;
+            }
+
+            // A DORMANT TRACK IS A MEMORY, NOT A CONTACT, and this is the single cause behind
+            // every identify order that was accepted and then quietly did nothing while the
+            // unit sat in a state it was perfectly free to divert from.
+            //
+            // Three different aircraft and helicopters, all idle, all in divertable states,
+            // were tasked against dormant tracks and none of them moved; every order against
+            // a live contact in the same mission succeeded and ended with the contact
+            // identified. Nothing is there to be found - the plot is showing where something
+            // was when it was last held - so the state machine's condition never resolves and
+            // the tasking field sits unread.
+            //
+            // The commander had already worked this out for itself from the dormant flag
+            // ("a stale dormant track the helo isn't prosecuting anyway") while the executor
+            // was still accepting these. Refusing is what should have been happening.
+            if (veh != null && veh.IsDormant != null && veh.IsDormant.Value)
+            {
+                Refuse(
+                    $"{unit.getName()} ({unit.UniqueID}) was not sent to identify contact " +
+                    $"{order.TargetContactId}: that track is DORMANT - nothing is holding it on a " +
+                    "sensor now and the position shown is where it was last seen, not where it is. " +
+                    "A unit sent there finds empty ocean. Regain contact first, or task something " +
+                    "against a live track.");
                 return false;
             }
 

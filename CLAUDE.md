@@ -156,6 +156,10 @@ The mechanism differs per hull type and choosing wrong is a silent no-op, not an
 - **Submarines have no order-driven identify path at all**, and `Submarine.cs:256` gates the
   field-driven one on `!IsPlayerObject`. A delegated player boat therefore cannot be told to
   identify anything; the executor refuses rather than pretending.
+- **A dormant track cannot be identified at all.** Nothing is holding it on a sensor and the
+  plot shows where it WAS, so a unit sent there finds empty ocean and the state machine
+  condition never resolves. This was the cause behind every identify order that was accepted
+  and then silently did nothing; `IdentifyContact` now refuses them.
 - **Aircraft only divert from unhurried states** (`Default`, `MPA`, `MaritimePatrol`,
   `Loitering`). A fighter already prosecuting an air contact ignores the order. That is what
   `currentOrder` in the picture is for, and what the verify pass checks.
