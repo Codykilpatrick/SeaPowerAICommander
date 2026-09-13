@@ -622,6 +622,31 @@ namespace SeaPowerAICommander
                         "this strike as NOT coming and plan without it. If you named a loadout, that choice " +
                         "replaced every alternative - order it again without one, or strike with something else.");
                 }
+
+                // THE OTHER STALL, AND THE ONE ACTUALLY REPORTED FROM THE FIRST BATTLE:
+                // aircraft assigned, airborne, and never arriving. Transition ends when the
+                // strike closes to _transitionEndFromTargetNM of its target, so a strike that
+                // cannot get there - out of range, turned back, orbiting - simply stays in it.
+                //
+                // Two sat in Transition for over half an hour with two aircraft each while
+                // the commander counted both as committed. It eventually noticed by reading
+                // ageSeconds and recovered all four airframes with ReturnToBase, which is the
+                // right call and should not depend on it happening to check.
+                //
+                // Longer threshold than the assignment stall because flying in genuinely
+                // takes time - this is meant to catch half an hour, not a long transit.
+                else if (strike.AgeSeconds > StalledTransitSeconds
+                         && string.Equals(strike.State, "Transition", StringComparison.Ordinal))
+                {
+                    Problem(picture,
+                        $"[verify] air strike {strike.Id} against contact {strike.TargetContactId} has been " +
+                        $"in Transition for {strike.AgeSeconds:F0}s with {strike.AircraftAssigned} aircraft " +
+                        "and has not reached its target. Transition only ends when the strike closes to " +
+                        "weapon range, so this one is not arriving - it is most likely beyond the range of " +
+                        "the airframes carrying it. Those aircraft are burning fuel over open water for " +
+                        "nothing: recover them with ReturnToBase rather than counting this strike as " +
+                        "committed, and do not raise another against the same target from the same base.");
+                }
             }
 
             picture.AirstrikesOrdered = state.AirstrikesOrdered;
@@ -834,6 +859,14 @@ namespace SeaPowerAICommander
         /// for ran to seven minutes and was still going.
         /// </summary>
         private const float StalledStrikeSeconds = 240f;
+
+        /// <summary>
+        /// How long a strike may spend flying to its target before the transit is treated as
+        /// one that will not complete. Generous, because a real strike does transit for a
+        /// long time - the observed failures ran to 2,024 and 1,653 seconds and were still
+        /// going when their aircraft were recalled.
+        /// </summary>
+        private const float StalledTransitSeconds = 900f;
 
         private static float GraceSeconds(ForceOrderKind kind)
         {
