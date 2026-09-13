@@ -595,6 +595,33 @@ namespace SeaPowerAICommander
                 }
 
                 strike.AgeSeconds = now - firstSeen;
+
+                // A strike that cannot find aircraft does not fail - it SPINS.
+                // AssigningAircraft re-runs on its own interval and only finishes once a
+                // loadout is chosen; if no loadout in the pool turns up an airframe, nothing
+                // is chosen, nothing is logged, and the strike sits there until its launch
+                // time limit expires. On the picture it is indistinguishable from one that
+                // is busy arming.
+                //
+                // One sat in AssigningAircraft for seven minutes with zero aircraft while
+                // the commander counted it as a committed second axis of attack and planned
+                // around it. Age alone was not enough: the commander has no idea what a
+                // normal assignment time looks like, so it needs telling.
+                //
+                // Named as a lever it can pull, because it has one - a forced loadout
+                // replaces the candidate pool outright, so a fit the base cannot currently
+                // fly leaves the strike no alternative to fall back to.
+                if (strike.AgeSeconds > StalledStrikeSeconds
+                    && strike.AircraftAssigned == 0
+                    && string.Equals(strike.State, "AssigningAircraft", StringComparison.Ordinal))
+                {
+                    Problem(picture,
+                        $"[verify] air strike {strike.Id} against contact {strike.TargetContactId} has been " +
+                        $"assigning aircraft for {strike.AgeSeconds:F0}s and still has none. It is not " +
+                        "arming, it is stuck: no loadout it is allowed to use has an airframe free. Treat " +
+                        "this strike as NOT coming and plan without it. If you named a loadout, that choice " +
+                        "replaced every alternative - order it again without one, or strike with something else.");
+                }
             }
 
             picture.AirstrikesOrdered = state.AirstrikesOrdered;
@@ -772,7 +799,12 @@ namespace SeaPowerAICommander
             // of those and still not prosecuting has NOT been beaten to it by other tasking -
             // and saying so anyway sent the commander off to find a replacement for a unit
             // that was available the whole time.
-            var busy = unit.AiState != null && !OrderExecutor.IsDivertableAirState(unit.AiState);
+            // Both halves matter, and the state alone gets it wrong. A helicopter given a
+            // ReturnToBase order reads CurrentOrder=ReturnToBase while its AiState is still
+            // Default for a cycle, and reporting that as "free to take the order" while the
+            // same sentence said it was under an RTB order was a straight contradiction.
+            var busy = (unit.AiState != null && !OrderExecutor.IsDivertableAirState(unit.AiState))
+                       || !string.IsNullOrEmpty(unit.CurrentOrder);
 
             Problem(picture,
                 $"[verify] {unit.Name} ({unit.Id}): ordered to identify contact {order.TargetContactId} " +
@@ -795,6 +827,14 @@ namespace SeaPowerAICommander
         /// "not prosecuting" reached IdentifySurfaceContact on the fourth. A grace shorter
         /// than the thing it is waiting for just relabels slow as broken.
         /// </summary>
+        /// <summary>
+        /// How long a strike may sit in AssigningAircraft with nothing assigned before it is
+        /// reported as stuck rather than busy. Arming is slow in this game, so this has to be
+        /// generous enough not to cry wolf over a bomber being loaded - the case it exists
+        /// for ran to seven minutes and was still going.
+        /// </summary>
+        private const float StalledStrikeSeconds = 240f;
+
         private static float GraceSeconds(ForceOrderKind kind)
         {
             switch (kind)
