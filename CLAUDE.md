@@ -159,6 +159,58 @@ The mechanism differs per hull type and choosing wrong is a silent no-op, not an
   `Loitering`). A fighter already prosecuting an air contact ignores the order. That is what
   `currentOrder` in the picture is for, and what the verify pass checks.
 
+## The verify pass must not mistake slow for broken
+
+`orderProblems` reaches the commander, so a false report is not a cosmetic bug — it is an
+instruction. Everything the verify pass checks takes TIME, and checking one cycle after
+ordering produced three wrong reports in the first four cycles of a live mission:
+
+| Order | Actually landed | Reported at N+1 |
+|---|---|---|
+| `SetSonar DeployTowedArray` | 3 cycles (it physically streams out) | "order did not take" |
+| `SetDepth AboveLayer` | 2 cycles | (nearly missed) |
+| `IdentifyContact` on an F-14 | 4 cycles, reaching `IdentifySurfaceContact` | "not prosecuting it" |
+
+The commander did as it was told every time: reassigned units that were already doing the
+job, and reissued orders that had landed. `BrainState.OrderIssuedAt` plus `GraceSeconds`
+now hold each check back until the thing could plausibly have happened. **When you add a
+verify case, give it a grace, and take the number from an observed run rather than taste.**
+
+Two specific traps inside it:
+
+- **`CurrentOrder` is the wrong signal for an aircraft.** Ships and helicopters are tasked
+  via `setOrder`, so their order slot fills at once; an aircraft is tasked by writing
+  `_ai._objectToIdentify` and the *game* writes the order only once its state machine picks
+  the target up. Check `AiState` for those. The identify transitions are built from
+  `Default`, `MPA`, `MaritimePatrol` and `Loitering` alone (`Aircraft.cs:259-266`), so a
+  formation FOLLOWER — always in `MovingInFormation` — can never take one. Task the leader.
+- **A held shot looks exactly like a finished one.** `AttackScheduler` deliberately keeps
+  non-farthest shooters out of `_currentEngageTasks` for the length of the stagger. Ask
+  `AttackScheduler.HasPending` before calling an attack over. Not doing so told the
+  commander "that attack is over - order it again", and it fired eight salvos of four at one
+  contact across four cycles believing it had fired two.
+
+Word the message so it cannot be read as an instruction to retry. "This is what a completed
+attack looks like, NOT a failed one" is the point of the sentence.
+
+## Reach is not capability — `canMountAirstrike`
+
+The three reach fields count ordnance **the unit fires itself**. An airfield fires none, so
+Andersen AFB reported `antiSurfaceReachNM 0` while holding six F-4E, two B-52G and an
+`AntiShipHeavy` fit. `unitsInReach` is built from those figures, so the base appeared on no
+contact's list, and the prompt tells the commander in the strongest terms that a unit not on
+the list cannot hit that contact. It never launched a sortie in a whole mission and left two
+destroyers to fight a Soviet SAG alone.
+
+`OwnUnit.CanMountAirstrike` says the thing reach cannot. It is deliberately a **flag, not a
+distance**: nothing in the strike pipeline compares base to target — the aircraft launch,
+fly, and go bingo if it was too far — so any radius would be invented. The range judgement
+is the commander's, and the prompt now says so.
+
+The general lesson is the one that keeps recurring here: **a field that is authoritative for
+one question gets read as authoritative for a neighbouring one.** When you write "this is
+THE field to use" into the prompt, say what it is the field for.
+
 ## `UnitFormation.Reform` has no case for `Loose`
 
 Its switch covers Vic, LineAbreast, LineAstern, Echelon, Box and Circle. `Loose` falls

@@ -344,9 +344,27 @@ public static class CommanderPrompt
         in orderProblems next cycle - believe it, and either fix the reason (someone has to
         be holding that contact on a sensor) or give the shot to another unit on the list.
 
-        An empty or absent unitsInReach means NOTHING you have can hit that contact from
-        where it is. That is a positioning problem, not an attack problem - close the range
-        or leave it alone.
+        An empty or absent unitsInReach means nothing you have can SHOOT that contact from
+        where it is. That is a positioning problem, not an attack problem - close the range,
+        or reach it with aircraft instead.
+
+        BECAUSE unitsInReach IS ABOUT WEAPONS A UNIT FIRES ITSELF, AND IT IS NOT THE WHOLE
+        OF YOUR REACH. An airfield or a carrier fires almost nothing on its own account, so
+        all three of its reach figures read 0 and it appears on no contact's list - while
+        its aircraft can strike hundreds of miles past anything in your surface force.
+        canMountAirstrike is the field that says so, and LaunchAirstrike is NOT gated on
+        unitsInReach.
+
+        Read that flag before you conclude you cannot touch something. An airbase holding
+        six fighters and two heavy bombers once sat out an entire battle without launching a
+        sortie, because its reach read 0 against every domain and nothing else contradicted
+        it - leaving two destroyers to fight a Soviet surface action group alone, and firing
+        their magazines dry at one contact.
+
+        The game does not check whether a strike can reach its target. The aircraft launch,
+        fly, and go bingo on fuel if it was too far, so the distance judgement is YOURS:
+        compare the contact's range against the sort of radius that airframe plausibly has,
+        and do not send a strike across an ocean.
 
         AND WHICH REACH. A unit's three reach figures count only ordnance it still HAS, so
         a zero is not an incapable platform - it is an empty one. airDefenceReachNM of 0 on

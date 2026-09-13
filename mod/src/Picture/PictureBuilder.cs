@@ -377,6 +377,11 @@ namespace SeaPowerAICommander.Picture
 
                 unit.AircraftAboard = aboard;
                 unit.AirstrikeLoadouts = AirstrikeLoadouts.Describe(obj);
+
+                // Describe() lists only fits the deck can actually launch a strike with -
+                // it validates each against FlightDeckGetUnitAndNumberForLoadout for
+                // PermittedUsage.Airstrike - so a non-empty result IS the capability.
+                unit.CanMountAirstrike = !string.IsNullOrEmpty(unit.AirstrikeLoadouts);
             }
             catch (Exception ex)
             {

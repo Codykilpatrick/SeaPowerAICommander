@@ -426,6 +426,26 @@ namespace SeaPowerAICommander.Picture
         public string AirstrikeLoadouts;
 
         /// <summary>
+        /// True when this unit can raise an air strike - it has a flight deck with armed
+        /// aircraft ready on it.
+        ///
+        /// THIS EXISTS BECAUSE THE REACH FIELDS SAY THE OPPOSITE. Reach counts ordnance the
+        /// unit fires itself, and an airfield fires none, so Andersen AFB reported 0nm
+        /// against every domain while holding six F-4E, two B-52G and an AntiShipHeavy fit.
+        /// Being built from those figures, unitsInReach listed it for no contact at all,
+        /// and the commander - correctly reading the field it had been told was decisive -
+        /// concluded the base could not touch anything and never launched a single sortie
+        /// from it in a whole mission. Two destroyers did all the shooting.
+        ///
+        /// A strike's range is its aircraft's, and the game does not check it: nothing in
+        /// the strike pipeline compares base to target, so the aircraft launch, fly, and go
+        /// bingo if it was too far. That judgement is the commander's to make, which is why
+        /// this is a capability flag and not a distance - a made-up radius would be a worse
+        /// lie than the zero it replaces.
+        /// </summary>
+        public bool CanMountAirstrike;
+
+        /// <summary>
         /// True when this unit is stationed in a formation.
         ///
         /// A formation follower takes its movement from the leader, so a MoveTo aimed at

@@ -878,6 +878,30 @@ namespace SeaPowerAICommander.Orders
                     return false;
                 }
 
+                // A wingman cannot be sent to look at anything, and this is the reason the
+                // order appeared to work on some aircraft and not others. Aircraft.cs:259-266
+                // builds the identify transitions from Default, MPA, MaritimePatrol and
+                // Loitering only - MovingInFormation, which is where every formation FOLLOWER
+                // sits, has no such transition. The field would be written and never read.
+                //
+                // Leaders show Default and divert; followers show MovingInFormation and do
+                // not, which read as one squadron mysteriously refusing until the states were
+                // logged side by side.
+                if (unit is Aircraft)
+                {
+                    var state = CurrentStateName(unit);
+                    if (state != null && !IsDivertableAirState(state))
+                    {
+                        Refuse(
+                            $"{unit.getName()} ({unit.UniqueID}) cannot be sent to identify contact " +
+                            $"{order.TargetContactId}: it is in {state}, and an aircraft only diverts " +
+                            "to an identify task from Default, MPA, MaritimePatrol or Loitering. A " +
+                            "formation follower is always in MovingInFormation - task the formation " +
+                            "LEADER, or an aircraft flying independently.");
+                        return false;
+                    }
+                }
+
                 // Submarine.cs:256 gates the IdentifyContact state on the boat NOT being a
                 // player object, so on a delegated player force the field would be set and
                 // the boat would ignore it. Refuse loudly rather than accept an order that
@@ -914,6 +938,41 @@ namespace SeaPowerAICommander.Orders
                 $"[diag] IdentifyContact {unit.getName()} -> contact {order.TargetContactId}: " +
                 DescribeTasking(unit));
             return true;
+        }
+
+        /// <summary>
+        /// The aircraft AI states an identify task can be picked up from.
+        ///
+        /// Taken from the transitions themselves (Aircraft.cs:259-266), which build
+        /// IdentifySurfaceContact and IdentifySubSurfaceContact out of exactly four source
+        /// states. Anything else - MovingInFormation, CAP, Intercept, AEW, BingoFuel,
+        /// ReturnToBase - has no edge into them, so the tasking field sits unread.
+        /// </summary>
+        public static bool IsDivertableAirState(string state)
+        {
+            if (string.IsNullOrEmpty(state)) return true;   // unknown: let the game decide
+
+            return state == "Default"
+                || state == "MPA"
+                || state == "MaritimePatrol"
+                || state == "Loitering";
+        }
+
+        /// <summary>Current state machine state, or null when it cannot be read.</summary>
+        private static string CurrentStateName(ObjectBase unit)
+        {
+            try
+            {
+                var machine = unit.StateMachine;
+                if (machine == null) return null;
+
+                var name = machine.CurrentStateName;
+                return string.IsNullOrEmpty(name) || name == "Null" ? null : name;
+            }
+            catch (Exception)
+            {
+                return null;
+            }
         }
 
         /// <summary>

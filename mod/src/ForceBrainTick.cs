@@ -100,6 +100,20 @@ namespace SeaPowerAICommander
             public readonly Dictionary<string, ForceOrder> StandingOrders =
                 new Dictionary<string, ForceOrder>();
 
+            /// <summary>
+            /// Game time each standing order was last issued, keyed identically.
+            ///
+            /// The verify pass needs this because NOTHING IT CHECKS HAPPENS INSTANTLY. A
+            /// towed array streams out over minutes; a submarine walks to a new depth band;
+            /// an aircraft's own AI picks up _objectToIdentify on its schedule, not ours.
+            /// Checking one cycle after ordering and calling "not yet" a failure produced
+            /// three false reports in the first four cycles of a live mission - and because
+            /// refusals now reach the commander, it acted on every one of them, reassigning
+            /// units that were already doing the job and reissuing orders that had landed.
+            /// </summary>
+            public readonly Dictionary<string, float> OrderIssuedAt =
+                new Dictionary<string, float>();
+
             public int TotalLosses;
 
             /// <summary>
@@ -285,8 +299,16 @@ namespace SeaPowerAICommander
 
             // Only orders that took effect become standing. Replaying a rejected order
             // would tell the brain a sunk ship is still under way.
+            //
+            // Re-issuing restarts the grace clock, which is the intent: the question the
+            // verify pass asks is "has this had time to take effect", not "how long ago did
+            // we first want it".
             foreach (var order in accepted)
-                state.StandingOrders[order.UnitId + ":" + order.Kind] = order;
+            {
+                var key = order.UnitId + ":" + order.Kind;
+                state.StandingOrders[key] = order;
+                state.OrderIssuedAt[key] = GameTime.time;
+            }
         }
 
         /// <summary>
@@ -384,7 +406,11 @@ namespace SeaPowerAICommander
                     Reason = null,
                 });
             }
-            foreach (var key in stale) state.StandingOrders.Remove(key);
+            foreach (var key in stale)
+            {
+                state.StandingOrders.Remove(key);
+                state.OrderIssuedAt.Remove(key);
+            }
 
             // Re-seed the roster for the next diff.
             state.KnownUnits.Clear();
@@ -401,7 +427,7 @@ namespace SeaPowerAICommander
             DrainRefusals(picture);
             TallyAirstrikes(picture, state);
             LogUnitState(picture);
-            VerifyStandingOrders(picture);
+            VerifyStandingOrders(state, picture);
 
             state.LastDecisionTime = now;
             state.Seeded = true;
@@ -727,15 +753,88 @@ namespace SeaPowerAICommander
 
             if (string.Equals(unit.CurrentOrder, "Identify", StringComparison.OrdinalIgnoreCase)) return;
 
+            // CurrentOrder IS THE WRONG SIGNAL ON ITS OWN, and only for aircraft. A ship or
+            // a helicopter is tasked through setOrder, so its order slot fills immediately;
+            // an aircraft is tasked by writing _ai._objectToIdentify and the game writes the
+            // order itself only once its state machine picks the target up. Checking the
+            // order slot therefore asked an aircraft to prove it had already started before
+            // it was allowed to start, and reported every one of them as refusing.
+            //
+            // The state is the honest signal for those: Aircraft.cs:259-266 names the state
+            // the transition leads to, and that is what being under way looks like.
+            if (unit.AiState != null && unit.AiState.IndexOf("Identify", StringComparison.OrdinalIgnoreCase) >= 0)
+                return;
+
             ignored++;
+
+            // Only assert a cause the state actually supports. The identify transitions fire
+            // from Default, MPA, MaritimePatrol and Loitering alone, so a unit sitting in one
+            // of those and still not prosecuting has NOT been beaten to it by other tasking -
+            // and saying so anyway sent the commander off to find a replacement for a unit
+            // that was available the whole time.
+            var busy = unit.AiState != null && !OrderExecutor.IsDivertableAirState(unit.AiState);
+
             Problem(picture,
                 $"[verify] {unit.Name} ({unit.Id}): ordered to identify contact {order.TargetContactId} " +
                 $"but is not prosecuting it{(unit.CurrentOrder == null ? "" : $" (it is under a {unit.CurrentOrder} order)")}" +
-                $"{(unit.AiState == null ? "" : $" - its AI is in {unit.AiState}")} - " +
-                "a unit already committed to something else does not divert. Send a different one.");
+                $"{(unit.AiState == null ? "" : $" - its AI is in {unit.AiState}")}. " +
+                (busy
+                    ? "A unit in that state does not divert - task one that is idle, or the " +
+                      "formation LEADER rather than a follower."
+                    : "It was free to take the order and has not, so the cause is not other " +
+                      "tasking - check that the contact is still something it can reach and see."));
         }
 
-        private static void VerifyStandingOrders(TacticalPicture picture)
+        /// <summary>
+        /// How long an order of this kind gets to take effect before silence is treated as
+        /// failure. GAME seconds, because these are physical processes running on game time.
+        ///
+        /// Every figure here is the observed one, taken from the mission that exposed the
+        /// problem rather than guessed: the towed array was still streaming three cycles
+        /// after the order, the depth change landed on the second, and the F-14 flagged as
+        /// "not prosecuting" reached IdentifySurfaceContact on the fourth. A grace shorter
+        /// than the thing it is waiting for just relabels slow as broken.
+        /// </summary>
+        private static float GraceSeconds(ForceOrderKind kind)
+        {
+            switch (kind)
+            {
+                // The array physically streams out, and then has to settle to a depth.
+                case ForceOrderKind.SetSonar:
+                    return 300f;
+
+                // The aircraft's own AI has to notice _objectToIdentify, and a helicopter
+                // sent across a screen has to get there.
+                case ForceOrderKind.IdentifyContact:
+                    return 240f;
+
+                // A boat changes depth by flying it, not by teleporting.
+                case ForceOrderKind.SetDepth:
+                    return 180f;
+
+                // Reform walks every station to a new offset.
+                case ForceOrderKind.SetFormation:
+                    return 180f;
+
+                // Everything else is a flag or a setpoint and takes effect on the tick.
+                default:
+                    return 0f;
+            }
+        }
+
+        private static bool WithinGrace(BrainState state, ForceOrder order)
+        {
+            var grace = GraceSeconds(order.Kind);
+            if (grace <= 0f) return false;
+
+            float issued;
+            if (!state.OrderIssuedAt.TryGetValue(order.UnitId + ":" + order.Kind, out issued))
+                return false;
+
+            return GameTime.time - issued < grace;
+        }
+
+        private static void VerifyStandingOrders(BrainState state, TacticalPicture picture)
         {
             if (picture.StandingOrders.Count == 0) return;
 
@@ -746,11 +845,22 @@ namespace SeaPowerAICommander
             foreach (var c in picture.Contacts) contacts[c.Id] = c;
 
             var ignored = 0;
+            var settling = 0;
 
             foreach (var order in picture.StandingOrders)
             {
                 OwnUnit unit;
                 if (!units.TryGetValue(order.UnitId, out unit)) continue;
+
+                // Too soon to tell. Say nothing rather than report a failure that has not
+                // happened - the standing order is replayed to the commander regardless, so
+                // it still knows the order is in force; it simply is not told to give up on
+                // it. Counted so a run of these is visible in our own log.
+                if (WithinGrace(state, order))
+                {
+                    settling++;
+                    continue;
+                }
 
                 switch (order.Kind)
                 {
@@ -892,12 +1002,20 @@ namespace SeaPowerAICommander
                         if (unit.EngagingContactIds != null
                             && unit.EngagingContactIds.Contains(order.TargetContactId)) break;
 
+                        // A shot this scheduler is still holding has not been fired and has
+                        // not been abandoned - it is waiting, on purpose, so the salvo
+                        // arrives together. It carries no engage task while it waits, which
+                        // is indistinguishable from a finished attack unless we ask.
+                        if (AttackScheduler.HasPending(order.UnitId, order.TargetContactId)) break;
+
                         ignored++;
                         Problem(picture,
                             $"[verify] {unit.Name} ({unit.Id}): ordered to attack contact " +
-                            $"{order.TargetContactId} but has no live engagement against it - that " +
-                            "attack is over. It is not still prosecuting the target; order it again " +
-                            "if you want more shots, or task it elsewhere.");
+                            $"{order.TargetContactId} and is no longer engaging it - the shots it was " +
+                            "going to take have been taken. This is what a completed attack looks " +
+                            "like, NOT a failed one, so do not reissue it expecting the first salvo " +
+                            "to have been missed. Order again only if you judge the target needs more " +
+                            "weapons than you have already sent it.");
                         break;
 
                 }

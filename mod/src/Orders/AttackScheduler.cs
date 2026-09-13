@@ -81,11 +81,15 @@ namespace SeaPowerAICommander.Orders
             if (plan.Count == 0) return accepted;
 
             var now = GameTime.time;
+            var longestHold = 0f;
             foreach (var p in plan)
             {
                 // Hold each shooter by however much sooner its weapon would otherwise land.
                 var delay = longestFlight - p.FireAtGameTime;
-                p.FireAtGameTime = now + (delay > 0f ? delay : 0f);
+                if (delay < 0f) delay = 0f;
+                if (delay > longestHold) longestHold = delay;
+
+                p.FireAtGameTime = now + delay;
                 Queue.Add(p);
             }
 
@@ -102,12 +106,44 @@ namespace SeaPowerAICommander.Orders
             }
             else
             {
+                // The spread is how long the FIRST shooter waits, not the longest flight -
+                // those are only the same number when some shooter is firing at zero range.
+                // Both format arguments used to be longestFlight, so the one figure this
+                // scheduler exists to produce was the one it never actually reported, and a
+                // group that fired together was indistinguishable from one that staggered.
                 Plugin.Log.LogInfo(
                     $"[attack] group '{group}': {plan.Count} shooter(s) scheduled, " +
-                    $"longest flight {longestFlight:F0}s, release spread {longestFlight:F0}s");
+                    $"longest flight {longestFlight:F0}s, release spread {longestHold:F0}s");
             }
 
             return accepted;
+        }
+
+        /// <summary>
+        /// Is a shot by this unit against this contact still waiting its turn?
+        ///
+        /// THE VERIFY PASS MUST ASK THIS BEFORE CALLING AN ATTACK DEAD. A held release has
+        /// not reached AutoAttackByClick yet, so the unit carries no engage task and looks
+        /// exactly like a shooter that finished - which is the state this scheduler puts
+        /// every non-farthest shooter into, deliberately, for as long as the stagger lasts.
+        ///
+        /// Skipping this check cost a magazine. A coordinated strike was scheduled, the
+        /// verify pass ran during the hold and reported "that attack is over - order it
+        /// again if you want more shots", and the commander did exactly as it was told:
+        /// eight salvos of four went at one contact across four cycles while it believed it
+        /// had fired two. The missiles it was told had not launched were in the queue below
+        /// the whole time.
+        /// </summary>
+        public static bool HasPending(int unitId, int targetId)
+        {
+            for (int i = 0; i < Queue.Count; i++)
+            {
+                var p = Queue[i];
+                if (p.Unit == null || p.Target == null) continue;
+                if (p.Unit.UniqueID == unitId && p.Target.UniqueID == targetId) return true;
+            }
+
+            return false;
         }
 
         /// <summary>
