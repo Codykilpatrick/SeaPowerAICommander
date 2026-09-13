@@ -160,8 +160,9 @@ The mechanism differs per hull type and choosing wrong is a silent no-op, not an
   plot shows where it WAS, so a unit sent there finds empty ocean and the state machine
   condition never resolves. This was the cause behind every identify order that was accepted
   and then silently did nothing; `IdentifyContact` now refuses them.
-- **Aircraft only divert from unhurried states** (`Default`, `MPA`, `MaritimePatrol`,
-  `Loitering`). A fighter already prosecuting an air contact ignores the order. That is what
+- **Aircraft only divert from unhurried states** (`Default`, `MPA`, `MaritimePatrol` -
+  NOT `Loitering`, whatever `Aircraft.cs:266` says; four live attempts from it never
+  diverted while every attempt from `Default` worked). A fighter already prosecuting an air contact ignores the order. That is what
   `currentOrder` in the picture is for, and what the verify pass checks.
 
 ## The verify pass must not mistake slow for broken

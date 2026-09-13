@@ -1039,10 +1039,25 @@ namespace SeaPowerAICommander.Orders
         {
             if (string.IsNullOrEmpty(state)) return true;   // unknown: let the game decide
 
+            // LOITERING IS DELIBERATELY NOT IN THIS LIST, AND THE DECOMPILE DISAGREES.
+            // Aircraft.cs:266 registers At(loitering, identifySurfaceContact, condition2),
+            // so on paper a loitering aircraft diverts. It does not. Four attempts across
+            // two aircraft - an F-14 flight three times and an EA-6B once, every one of them
+            // idle, in range, and aimed at a live contact - produced no divert at all, while
+            // every attempt from Default in the same missions succeeded and ended with the
+            // contact identified.
+            //
+            // Loitering also has At(loitering, state_default, ...) on a condition that a
+            // loitering aircraft meets routinely, which is the likeliest explanation: the
+            // machine leaves Loitering by that edge before the identify edge is ever taken,
+            // and where it lands is not where the tasking gets picked up.
+            //
+            // Left in the list, this cost the commander four cycles of re-tasking units that
+            // were never going to move. The house rule applies - read a live run, not the
+            // decompile - so if a later run shows a loitering aircraft diverting, put it back.
             return state == "Default"
                 || state == "MPA"
-                || state == "MaritimePatrol"
-                || state == "Loitering";
+                || state == "MaritimePatrol";
         }
 
         /// <summary>Current state machine state, or null when it cannot be read.</summary>
