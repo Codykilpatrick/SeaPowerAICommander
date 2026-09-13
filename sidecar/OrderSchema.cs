@@ -29,7 +29,7 @@ public static class OrderSchema
                 {
                     ["type"] = "string",
                     ["enum"] = kinds,
-                    ["description"] = "The order type. MoveTo steers a SURFACE OR SUBSURFACE unit to a position (air units are refused - they fly their tasking), SetSpeed sets speed in knots, SetWeaponStatus sets Tight/Free/Hold, SetEmcon goes Silent or Radiate.",
+                    ["description"] = "The order type. MoveTo steers a SURFACE OR SUBSURFACE unit to a position (air units are refused - they fly their tasking), SetSpeed sets speed in knots, SetWeaponStatus sets Tight/Free/Hold, SetEmcon goes Silent or Radiate. IdentifyContact sends a unit to find out what a contact is and is the ONLY way to redirect an aircraft already in the air, ReturnToBase recovers one, SetDepth puts a submarine in a depth band, SetSonar pings or streams a towed array, SetFormation reshapes a formation.",
                 },
                 ["unitId"] = new JsonObject
                 {
@@ -60,7 +60,7 @@ public static class OrderSchema
                 ["targetContactId"] = new JsonObject
                 {
                     ["type"] = "integer",
-                    ["description"] = "AttackTarget and CoordinatedAttack only. Id of a CONTACT from the contacts list - never one of your own units. Use 0 for other order kinds.",
+                    ["description"] = "AttackTarget, CoordinatedAttack, LaunchAirstrike and IdentifyContact. Id of a CONTACT from the contacts list - never one of your own units. Use 0 for other order kinds.",
                 },
                 ["salvo"] = new JsonObject
                 {
@@ -90,6 +90,39 @@ public static class OrderSchema
                     ["enum"] = new JsonArray("CAP", "AEW", "Recon", "MPA", "ASW", "Intercept"),
                     ["description"] = "LaunchAircraft only. The standing mission to launch on: CAP and Intercept are air defence, AEW and Recon and MPA extend your sensor picture, ASW hunts submarines. Use \"CAP\" for other order kinds.",
                 },
+                ["loadout"] = new JsonObject
+                {
+                    ["type"] = "string",
+                    ["description"] = "LaunchAirstrike only. The weapons fit to send, named EXACTLY as it appears in the ordering unit's airstrikeLoadouts - e.g. \"AntiShip\". Use \"\" to let the game choose, which it does by airframe count rather than by suitability. Naming one the base cannot fly is refused, so read airstrikeLoadouts first. Use \"\" for other order kinds.",
+                },
+                ["depth"] = new JsonObject
+                {
+                    ["type"] = "string",
+                    ["enum"] = new JsonArray(
+                        "Surface", "Periscope", "Shallow", "AboveLayer", "BelowLayer", "Deep", "VeryDeep"),
+                    ["description"] = "SetDepth only, and submarines only. Bands, not feet - what each one means in feet depends on the boat and the local layer. AboveLayer and BelowLayer are relative to conditions.layerDepth. Use \"Shallow\" for other order kinds.",
+                },
+                ["sonar"] = new JsonObject
+                {
+                    ["type"] = "string",
+                    ["enum"] = new JsonArray(
+                        "ActiveOn", "ActiveOff", "DeployTowedArray", "RetractTowedArray",
+                        "TowedArrayAboveLayer", "TowedArrayBelowLayer"),
+                    ["description"] = "SetSonar only. ActiveOn/ActiveOff ping with the hull sonar - loud, and it gives your position away. The towed array is passive and separate: deploying it costs speed, and putting it above or below the layer decides which side of the thermocline you can hear. Use \"ActiveOff\" for other order kinds.",
+                },
+                ["formationPattern"] = new JsonObject
+                {
+                    ["type"] = "string",
+                    ["enum"] = new JsonArray(
+                        "Circle", "Vic", "Echelon", "LineAbreast", "LineAstern", "Box"),
+                    ["description"] = "SetFormation only. Circle screens a high-value unit on every bearing, LineAbreast sweeps a front, LineAstern is a column for transiting or following a swept channel, Vic and Echelon and Box are directional screens. Use \"Circle\" for other order kinds.",
+                },
+                ["weapon"] = new JsonObject
+                {
+                    ["type"] = "string",
+                    ["enum"] = new JsonArray("Auto", "Missile", "Torpedo", "Gun", "ASROC", "RBU"),
+                    ["description"] = "AttackTarget and CoordinatedAttack only. Auto lets the unit's own allocation choose and is right most of the time. Name a type only when the choice matters, and only one the unit's weaponTypes lists - naming one it does not carry falls back to Auto. Ignored for aircraft. Use \"Auto\" for other order kinds.",
+                },
                 ["reason"] = new JsonObject
                 {
                     ["type"] = "string",
@@ -101,7 +134,7 @@ public static class OrderSchema
             ["required"] = new JsonArray(
                 "kind", "unitId", "latitude", "longitude", "speedKnots", "weaponStatus",
                 "targetContactId", "salvo", "coordinationGroup", "strikeType", "emcon",
-                "airMission", "reason"),
+                "airMission", "loadout", "depth", "sonar", "formationPattern", "weapon", "reason"),
             ["additionalProperties"] = false,
         };
 

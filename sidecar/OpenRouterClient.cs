@@ -220,6 +220,19 @@ public sealed class OpenRouterClient : IDisposable
                 Emcon = o["emcon"]?.GetValue<string>() ?? string.Empty,
                 AirMission = o["airMission"]?.GetValue<string>() ?? string.Empty,
 
+                // Same reasoning as emcon and airMission above, and the same empty default:
+                // a missing depth falling back to "Surface" would broach a submarine nobody
+                // asked to surface, and a missing sonar falling back to ActiveOn would start
+                // a ship pinging. The executor refuses an empty and says which field it was.
+                Loadout = o["loadout"]?.GetValue<string>() ?? string.Empty,
+                Depth = o["depth"]?.GetValue<string>() ?? string.Empty,
+                Sonar = o["sonar"]?.GetValue<string>() ?? string.Empty,
+                FormationPattern = o["formationPattern"]?.GetValue<string>() ?? string.Empty,
+
+                // Weapon is the exception: "Auto" IS the safe answer, and it is what every
+                // attack did before the field existed.
+                Weapon = o["weapon"]?.GetValue<string>() ?? "Auto",
+
                 Reason = o["reason"]?.GetValue<string>() ?? string.Empty,
             });
         }

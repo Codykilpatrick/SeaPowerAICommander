@@ -268,6 +268,105 @@ namespace SeaPowerAICommander.Picture
         public bool HasSearchRadar;
 
         /// <summary>
+        /// Whether an ACTIVE sonar is fitted, and whether a towed array is.
+        ///
+        /// Same reason <see cref="HasSearchRadar"/> exists: without them "not pinging" and
+        /// "has nothing to ping with" look identical, and a SetSonar order spent on a
+        /// frigate with no tail is an order spent on nothing.
+        /// </summary>
+        public bool HasActiveSonar;
+
+        /// <summary>
+        /// What the towed array is doing: "Stowed", "DeployedAboveLayer" or
+        /// "DeployedBelowLayer". Null when none is fitted.
+        ///
+        /// Which side of the layer the tail is listening on is the whole point of having
+        /// one - a hull sonar above the layer is deaf to a boat sitting under it, and the
+        /// array is the only sensor that can be put on the other side.
+        /// </summary>
+        public string TowedArray;
+
+        /// <summary>
+        /// The depth band a submarine has been told to hold: "Surface", "Periscope",
+        /// "Shallow", "AboveLayer", "BelowLayer", "Deep" or "VeryDeep". Null for anything
+        /// that is not a submarine.
+        ///
+        /// This is the COMMANDED band, not the observed depth - altitude already carries
+        /// that in metres. The two differ while the boat is changing depth, and they also
+        /// differ when the boat's own state machine has overridden the band, which is the
+        /// case worth seeing: it re-picks a depth on every state change (sprinting,
+        /// drifting, prosecuting a contact), so an ordered band does not necessarily hold.
+        /// </summary>
+        public string CommandedDepth;
+
+        /// <summary>
+        /// The formation this unit belongs to and the shape that formation is currently
+        /// in. Null when the unit is not in one.
+        ///
+        /// Two units reporting the same formationName are in the same formation, which is
+        /// the only way to tell a screen from a scattering of independent ships.
+        /// </summary>
+        public string FormationName;
+        public string FormationPattern;
+
+        /// <summary>
+        /// The base or carrier this air unit would return to, when it has one. Null for
+        /// everything else, and null for an aircraft with nowhere to go - which is the
+        /// case that matters, because ReturnToBase is refused for it.
+        /// </summary>
+        public string HomeBaseName;
+
+        /// <summary>
+        /// The order the game itself believes this unit is executing - "Identify",
+        /// "ReturnToBase", "Attack" and so on. Null when it is under none.
+        ///
+        /// This is the game's own order slot, not ours, and it is the only confirmation
+        /// that an IdentifyContact or ReturnToBase order was taken up rather than dropped
+        /// by a unit already busy with something of higher priority.
+        /// </summary>
+        public string CurrentOrder;
+
+        /// <summary>
+        /// Contacts this unit has live engagements against right now. Null when it is
+        /// shooting at nothing.
+        ///
+        /// An attack order stays in standingOrders for as long as the contact is still
+        /// held, which says what was ORDERED and not what is happening. A submarine was
+        /// described by its own commander as "prosecuting the Alfa contact close aboard"
+        /// long after it had stopped - the order was still standing, so the commander
+        /// reasoned from it, and planned around an attack that had finished.
+        ///
+        /// This is read from the unit's own engage tasks, so it is the game's answer rather
+        /// than ours. An order that appears in standingOrders but not here is over: the
+        /// shots were taken, the target was lost, or the tactical AI dropped it.
+        /// </summary>
+        public List<int> EngagingContactIds;
+
+        /// <summary>
+        /// The name of the state the unit's own AI is currently in - "Default",
+        /// "MovingInFormation", "CAP", "ReturnToBase" and so on.
+        ///
+        /// DIAGNOSTIC. Added because IdentifyContact orders were accepted and then ignored
+        /// by every aircraft in a live mission, and nothing anywhere said why: the identify
+        /// states are reachable only from a handful of others, so which state a unit is
+        /// sitting in decides whether it can be retasked at all, and that was invisible.
+        ///
+        /// It also explains a depth order being overridden - the band is re-picked on every
+        /// submarine state change, and this names the state that did it.
+        /// </summary>
+        public string AiState;
+
+        /// <summary>
+        /// The ammunition TYPES this unit still has, e.g. "Missile, Torpedo, Gun". Null
+        /// when it has nothing left to shoot.
+        ///
+        /// The reach fields say how far it can hit a given kind of target; this says with
+        /// what, which is what the weapon field on an attack order needs. A destroyer with
+        /// "Gun" alone is a destroyer that has fired off its missiles.
+        /// </summary>
+        public string WeaponTypes;
+
+        /// <summary>
         /// How badly hurt this unit is, 0-100.
         ///
         /// Summed integrity lost across every system, over the hull's damage capacity.
@@ -311,6 +410,20 @@ namespace SeaPowerAICommander.Picture
         /// it. An air group you cannot see is an air group you will not use.
         /// </summary>
         public List<DeckAircraft> AircraftAboard;
+
+        /// <summary>
+        /// The weapons fits this deck can send a strike out with, and how many aircraft each
+        /// has ready - "AntiShip x4, Strike x8". Null for anything without a flight deck.
+        ///
+        /// This is what a loadout on a LaunchAirstrike order has to be named from. Without
+        /// it the commander would be guessing at ini keys, and a guess that misses is
+        /// refused rather than flown.
+        ///
+        /// It is also the answer to a question the strike type cannot settle: whether the
+        /// base can actually put anti-ship weapons on a target. A deck listing only Strike
+        /// and StrikeHeavy has nothing to hit a warship with, however the order is phrased.
+        /// </summary>
+        public string AirstrikeLoadouts;
 
         /// <summary>
         /// True when this unit is stationed in a formation.
@@ -514,6 +627,28 @@ namespace SeaPowerAICommander.Picture
         public int NearestUnitId;
 
         /// <summary>
+        /// Ids of every own unit that can reach this contact from where it is right now,
+        /// using the reach that matches the contact's domain. Null when none can.
+        ///
+        /// <see cref="NearestUnitId"/> answers a different and narrower question. The
+        /// nearest unit is frequently not a shooter - it may be a frigate screening ahead
+        /// of the cruisers that actually carry the missiles - and for every OTHER unit the
+        /// picture gave no range at all, so the commander had nothing to compare its reach
+        /// against and guessed.
+        ///
+        /// That guess cost a strike. Two cruisers were ordered to fire four missiles each
+        /// at a Sovremenny; the commander justified the second with "its 90nm reach exceeds
+        /// the target's 50nm envelope" - comparing reach to the TARGET'S envelope, because
+        /// no range to that ship existed to compare against. It was out of range, the game
+        /// declined silently, and four missiles went in where eight were intended.
+        ///
+        /// Computed from the same nominal reach figures the own units report, so it does
+        /// not model sensor channel or terrain masking. Treat it as the shortlist of
+        /// plausible shooters, not a firing solution.
+        /// </summary>
+        public List<int> UnitsInReach;
+
+        /// <summary>
         /// Highest terrain in metres on the bearing from the force centre to this contact.
         ///
         /// Above zero means land lies between - an approach on this bearing can be masked,
@@ -546,5 +681,17 @@ namespace SeaPowerAICommander.Picture
 
         /// <summary>The game's own id for this strike, so one can be followed between cycles.</summary>
         public int Id;
+
+        /// <summary>
+        /// The weapons fit the strike is actually flying with - "AntiShip", "StrikeHeavy",
+        /// "GuidedStrike" and so on. Null until the strike has picked one.
+        ///
+        /// The strike TYPE does not determine this. Missile against a ship offers the
+        /// anti-ship loadouts first, but the game then chooses whichever loadout in that
+        /// pool has the most airframes available rather than the one best suited to the
+        /// target, so a base stocked mainly for land attack sends a land-attack fit at a
+        /// destroyer and nothing says so. This is the field that says so.
+        /// </summary>
+        public string Loadout;
     }
 }

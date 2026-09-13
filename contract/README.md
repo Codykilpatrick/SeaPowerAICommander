@@ -41,6 +41,20 @@ expressible as one of these, and each was added because its absence was visible 
 - **`LaunchAirstrike`** — aircraft sit on the ground until something launches them. The
   commander kept identifying idle aircraft as wasted assets and then tasking them with
   movement orders they could not obey.
+- **`IdentifyContact`** — every other order assumes the picture is already good enough to
+  act on; nothing improved it. A GIUK interception was lost inside that loop, both sides
+  unable to classify anything and therefore unable to do anything. It is also the only way
+  to redirect an aircraft already in the air: `MoveTo` is refused for air units, but naming
+  a contact is how the game's own AI expects to be tasked, so the aircraft diverts.
+- **`ReturnToBase`** — without it a deck is a one-shot asset. Everything launched flies
+  until it runs out of fuel or ordnance and decides for itself.
+- **`SetDepth`** — which side of the layer a boat sits on is the submarine decision in this
+  game, the layer was already reported in every picture, and there was no way to act on it.
+- **`SetSonar`** — `SetEmcon` deliberately leaves active sonar alone, which was right and
+  left all of ASW sensor management outside the action space: nothing could ping, stream a
+  towed array, or put one on the far side of the layer from the boat it was hunting.
+- **`SetFormation`** — formation geometry is force-level by definition and was the one
+  thing at this altitude the commander could not touch.
 
 ## `IsPositionDependent` and why it lives here
 
@@ -102,6 +116,12 @@ The fields that need care:
 3. Add any fields it needs to `ForceOrder` (they are a flat union — only some apply to each
    kind, which is deliberate for JSON-schema friendliness).
 4. Implement it in `mod/src/Orders/OrderExecutor.cs`, with validation.
+5. Read its fields out of the model response in `sidecar/OpenRouterClient.cs`, in `Parse`.
+
+Step 5 is the one that gets forgotten, because the first four sit together and it does not.
+`Parse` hand-maps every property by name, so a field missing from it arrives null however
+correct the schema is - and the order is then refused for an empty value that looks like the
+model was at fault.
 
 The schema widens automatically. The executor does not — and it validates every order
 against the live task force regardless, because model output is never trusted.

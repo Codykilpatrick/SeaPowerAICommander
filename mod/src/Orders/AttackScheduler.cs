@@ -25,6 +25,14 @@ namespace SeaPowerAICommander.Orders
             public ObjectBase Unit;
             public ObjectBase Target;
             public int Salvo;
+
+            /// <summary>
+            /// The weapon this shot was resolved to, so a held release fires what the
+            /// commander asked for rather than whatever the unit would have picked by the
+            /// time its turn came. Also feeds the flight-time estimate, so the schedule is
+            /// computed for the weapon that will actually be launched.
+            /// </summary>
+            public Ammunition.Type AmmoType;
             public string Group;
         }
 
@@ -52,7 +60,9 @@ namespace SeaPowerAICommander.Orders
                 var target = resolveContact(order.TargetContactId);
                 if (target == null) continue;
 
-                var flight = EstimateTimeOfFlightSeconds(unit, target);
+                var ammo = OrderExecutor.ResolveAmmoType(unit, target, order);
+
+                var flight = EstimateTimeOfFlightSeconds(unit, target, ammo);
                 if (flight > longestFlight) longestFlight = flight;
 
                 plan.Add(new Pending
@@ -61,6 +71,7 @@ namespace SeaPowerAICommander.Orders
                     Unit = unit,
                     Target = target,
                     Salvo = order.Salvo > 0 ? order.Salvo : 1,
+                    AmmoType = ammo,
                     Group = group,
                 });
 
@@ -122,8 +133,28 @@ namespace SeaPowerAICommander.Orders
 
                 try
                 {
-                    p.Unit._ai.AutoAttackByClick(p.Target, Ammunition.Type.None, ignoreExecuting: false, salvo: p.Salvo);
-                    Plugin.Log.LogInfo($"[attack] group '{p.Group}': {p.Unit.getName()} releasing on schedule");
+                    // "Releasing on schedule" used to be printed unconditionally, which is
+                    // how a two-cruiser strike reported both shooters releasing while only
+                    // one of them fired. The release is held by this scheduler, so the
+                    // moment it is declined is here and nowhere else.
+                    p.Unit._ai.AutoAttackByClick(p.Target, p.AmmoType, ignoreExecuting: false, salvo: p.Salvo);
+
+                    if (OrderExecutor.IsEngaging(p.Unit, p.Target))
+                    {
+                        Plugin.Log.LogInfo(
+                            $"[attack] group '{p.Group}': {p.Unit.getName()} releasing on schedule " +
+                            $"({p.Salvo} shot(s))");
+                    }
+                    else
+                    {
+                        var why =
+                            $"{p.Unit.getName()} ({p.Unit.UniqueID}) did NOT fire its part of " +
+                            $"coordinated attack '{p.Group}' - the game declined the engagement, so " +
+                            $"the salvo arrived {p.Salvo} shot(s) lighter than you planned";
+
+                        Plugin.Log.LogWarning($"[attack] {why}");
+                        OrderExecutor.Refuse(why);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -133,6 +164,8 @@ namespace SeaPowerAICommander.Orders
         }
 
         private const float KnotsToMetresPerSecond = 0.514444f;
+
+        private const float MetresPerNauticalMile = 1852f;
 
         /// <summary>Beyond this a flight-time estimate is treated as wrong rather than
         /// long. Twenty minutes covers any real shot in this game with margin.</summary>
@@ -155,15 +188,30 @@ namespace SeaPowerAICommander.Orders
         /// Kirov survived it, and the log cheerfully reported a coordinated attack the
         /// whole time. The game's own ini default for MaxVelocity is 540 knots, and the
         /// game computes its own _timeToMaxRange from that same field.
+        ///
+        /// THE RANGE COMES FROM getDistanceInMiles, NOT GetDistance. That was the other half
+        /// of the same bug and it survived the velocity fix. GeoPosition.GetDistance returns
+        /// UNITY ENGINE UNITS - degrees divided by 0.00060475 - and one of those is 67.2
+        /// metres, not the 1000 this code assumed. Every range was therefore 14.9x too
+        /// large, every flight time with it, and essentially every estimate blew through
+        /// MaxCredibleFlightSeconds below.
+        ///
+        /// Which meant the guard fired, the group launched together, and the log said so
+        /// honestly - "flight time could not be estimated for these weapons" - while the
+        /// actual cause was arithmetic here. A coordinated attack on a Sovremenny 105nm away
+        /// was estimated at 1613nm; 1613 / 14.9 = 108, which is the number the picture had
+        /// all along. Until this was fixed, CoordinatedAttack had never once staggered a
+        /// release.
         /// </summary>
-        private static float EstimateTimeOfFlightSeconds(ObjectBase unit, ObjectBase target)
+        private static float EstimateTimeOfFlightSeconds(ObjectBase unit, ObjectBase target, Ammunition.Type ammoType)
         {
             try
             {
-                var metres = (float)unit._geoPosition.GetDistance(target._geoPosition) * 1000f;
+                var metres = (float)unit._geoPosition.getDistanceInMiles(target._geoPosition)
+                             * MetresPerNauticalMile;
 
                 var fastest = 0f;
-                var ammo = unit._ai != null ? unit._ai.AmmunitionForTarget(target) : null;
+                var ammo = unit._ai != null ? unit._ai.AmmunitionForTarget(target, ammoType) : null;
                 if (ammo != null)
                 {
                     foreach (var a in ammo)

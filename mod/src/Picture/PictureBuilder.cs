@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using SeaPower;
+using SeaPowerAICommander.Orders;
 using UnityEngine;
 
 namespace SeaPowerAICommander.Picture
@@ -288,6 +289,7 @@ namespace SeaPowerAICommander.Picture
                     SurfaceSearchRadarOn = obj.IsSurfaceSearchRadarsOn != null && obj.IsSurfaceSearchRadarsOn.Value,
                     ActiveSonarOn = obj.IsActiveSonarsOn != null && obj.IsActiveSonarsOn.Value,
                     HasSearchRadar = obj.HasAirSearchRadar() || obj.HasSurfaceSearchRadar(),
+                    HasActiveSonar = obj.HasActiveSonar(),
                     InFormation = obj.InFormation != null && obj.InFormation.Value,
                     IsFormationLeader = obj.IsFormationLeader,
                     ActsIndependentlyInFormation =
@@ -299,6 +301,13 @@ namespace SeaPowerAICommander.Picture
                 ApplyCommandedSpeed(unit, obj);
                 ApplyRoute(unit, obj);
                 ApplyReach(unit, obj);
+                ApplySonar(unit, obj);
+                ApplyDepth(unit, obj);
+                ApplyHomeBase(unit, obj);
+                ApplyCurrentOrder(unit, obj);
+                ApplyWeaponTypes(unit, obj);
+                ApplyAiState(unit, obj);
+                ApplyEngagements(unit, obj);
 
                 picture.OwnUnits.Add(unit);
             }
@@ -367,6 +376,7 @@ namespace SeaPowerAICommander.Picture
                 }
 
                 unit.AircraftAboard = aboard;
+                unit.AirstrikeLoadouts = AirstrikeLoadouts.Describe(obj);
             }
             catch (Exception ex)
             {
@@ -397,6 +407,12 @@ namespace SeaPowerAICommander.Picture
 
                 if (formation.MaxFormationSpeed != null)
                     unit.MaxFormationSpeedKnots = Finite(formation.MaxFormationSpeed.Value);
+
+                // Which formation, and what shape it is in. Two units reporting the same
+                // name are in the same formation - the only way a force-level commander
+                // can tell a screen from several ships that happen to be near each other.
+                unit.FormationName = formation.Name;
+                unit.FormationPattern = formation.Pattern.ToString();
             }
             catch (Exception ex)
             {
@@ -482,6 +498,256 @@ namespace SeaPowerAICommander.Picture
             return Finite(best * UnityToNauticalMiles);
         }
 
+
+        /// <summary>
+        /// What the towed array is doing.
+        ///
+        /// Reported only when one is fitted and serviceable - a frigate without a tail
+        /// should not spend tokens on every cycle saying so, and "Stowed" on a ship that
+        /// has nothing to stream would read as a thing the commander could fix.
+        ///
+        /// Above or below the layer is read from the sonars that are actually streamed,
+        /// because SearchBelowLayer is meaningless on a stowed array and the game leaves
+        /// whatever was last set sitting in it.
+        /// </summary>
+        private static void ApplySonar(OwnUnit unit, ObjectBase obj)
+        {
+            try
+            {
+                var towed = obj._obp != null ? obj._obp._towedSonarSystems : null;
+                if (towed == null || towed.Count == 0) return;
+
+                var fitted = false;
+                var deployed = false;
+                var below = false;
+
+                foreach (var sonar in towed)
+                {
+                    if (sonar == null) continue;
+                    if (sonar.Inoperable != null && sonar.Inoperable.Value) continue;
+
+                    fitted = true;
+                    if (sonar.IsOn == null || !sonar.IsOn.Value) continue;
+
+                    deployed = true;
+                    if (sonar.SearchBelowLayer != null && sonar.SearchBelowLayer.Value) below = true;
+                }
+
+                if (!fitted) return;
+
+                unit.TowedArray = !deployed ? "Stowed"
+                    : below ? "DeployedBelowLayer"
+                    : "DeployedAboveLayer";
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.LogWarning($"[picture] towed sonar unreadable for {unit.Name}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// The depth band a boat has been told to hold.
+        ///
+        /// Not the same thing as its altitude, which is already in the picture: this is the
+        /// COMMANDED band, and the gap between the two is the whole point. The boat's own
+        /// state machine re-picks a preset on every state change, so a band the commander
+        /// did not order is the visible evidence that its depth order was overridden.
+        /// </summary>
+        private static void ApplyDepth(OwnUnit unit, ObjectBase obj)
+        {
+            var sub = obj as Submarine;
+            if (sub == null) return;
+
+            unit.CommandedDepth = DepthBands.Name(sub._currentPresetDepth);
+        }
+
+        /// <summary>
+        /// Where an air unit would go if told to return.
+        ///
+        /// Only for air units, and only when there is one, because "no home base" is the
+        /// case the commander needs to see - a ReturnToBase order is refused for an
+        /// aircraft whose carrier has sunk, and without this the refusal looks arbitrary.
+        /// </summary>
+        private static void ApplyHomeBase(OwnUnit unit, ObjectBase obj)
+        {
+            try
+            {
+                if (!obj.IsAirUnit) return;
+
+                var home = obj.getHomeBase();
+                if (home == null || home.IsDestroyed) return;
+
+                unit.HomeBaseName = home.getName();
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.LogWarning($"[picture] home base unreadable for {unit.Name}: {ex.Message}");
+            }
+        }
+
+
+        /// <summary>
+        /// What this unit is actually shooting at, from its own engage tasks.
+        ///
+        /// Not the same thing as what it was ordered to shoot at. A standing AttackTarget
+        /// order persists while the contact is held, so it describes an intention that may
+        /// be minutes finished - which is how a commander came to describe a submarine as
+        /// prosecuting a contact it had stopped engaging.
+        /// </summary>
+        private static void ApplyEngagements(OwnUnit unit, ObjectBase obj)
+        {
+            try
+            {
+                List<int> targets = null;
+
+                // Aircraft never hold an engage task - the target lives on their own AI as
+                // _objectToDestroy instead (AI.cs:2242). Reading only the task list would
+                // report every strike aircraft in the force as engaging nothing.
+                if (obj is Aircraft)
+                {
+                    var destroy = obj._ai != null ? obj._ai._objectToDestroy : null;
+                    if (destroy != null && !destroy.IsDestroyed)
+                        targets = new List<int> { destroy.UniqueID };
+
+                    unit.EngagingContactIds = targets;
+                    return;
+                }
+
+                var tasks = obj._currentEngageTasks;
+                if (tasks == null || tasks.Count == 0) return;
+
+                foreach (var task in tasks)
+                {
+                    var target = task != null ? task._targetObject : null;
+                    if (target == null || target.IsDestroyed) continue;
+
+                    targets ??= new List<int>();
+                    if (!targets.Contains(target.UniqueID)) targets.Add(target.UniqueID);
+                }
+
+                unit.EngagingContactIds = targets;
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.LogWarning($"[picture] engagements unreadable for {unit.Name}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Which state the unit's own AI is in.
+        ///
+        /// DIAGNOSTIC - see OwnUnit.AiState. Cheap: one enum-ish string per unit, and the
+        /// game computes it as a GetType().Name on a field it already holds.
+        /// </summary>
+        private static void ApplyAiState(OwnUnit unit, ObjectBase obj)
+        {
+            try
+            {
+                var machine = obj.StateMachine;
+                if (machine == null) return;
+
+                var name = machine.CurrentStateName;
+                if (string.IsNullOrEmpty(name) || name == "Null") return;
+
+                unit.AiState = name;
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.LogWarning($"[picture] AI state unreadable for {unit.Name}: {ex.Message}");
+            }
+        }
+        /// <summary>
+        /// The game's own order slot - Identify, ReturnToBase, Attack and so on.
+        ///
+        /// This is not our order log. It is what the unit's state machine believes it is
+        /// doing, and it is the only confirmation available that an IdentifyContact or
+        /// ReturnToBase order was taken up rather than dropped by a unit already committed
+        /// to something of higher priority.
+        /// </summary>
+        private static void ApplyCurrentOrder(OwnUnit unit, ObjectBase obj)
+        {
+            try
+            {
+                var order = obj.CurrentOrder != null ? obj.CurrentOrder.Value : null;
+                if (order == null || order.OrderType == Order.Type.None) return;
+
+                unit.CurrentOrder = order.OrderType.ToString();
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.LogWarning($"[picture] current order unreadable for {unit.Name}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Which kinds of weapon this unit still has rounds for.
+        ///
+        /// The reach fields say how far it can hit a given kind of TARGET; this says with
+        /// what. Both are needed to name a weapon on an attack order, and a unit reporting
+        /// "Gun" alone is one that has fired off its missiles - which the reach figures
+        /// show as a number falling rather than as a magazine emptying.
+        ///
+        /// Counts only ordnance still aboard, same as the reach fields.
+        /// </summary>
+        private static void ApplyWeaponTypes(OwnUnit unit, ObjectBase obj)
+        {
+            try
+            {
+                if (obj.AmmunitionAmountDictionary == null) return;
+
+                List<string> found = null;
+
+                foreach (var entry in obj.AmmunitionAmountDictionary)
+                {
+                    if (entry.Value < 1) continue;
+
+                    var ammo = obj.getAmmunitionByName(entry.Key);
+                    var ap = ammo != null ? ammo._ap : null;
+                    if (ap == null) continue;
+
+                    var name = WeaponTypeName(ap._type);
+                    if (name == null) continue;
+
+                    found ??= new List<string>();
+                    if (!found.Contains(name)) found.Add(name);
+                }
+
+                if (found == null) return;
+                unit.WeaponTypes = string.Join(", ", found.ToArray());
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.LogWarning($"[picture] weapon types unreadable for {unit.Name}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// The commander's vocabulary for an ammunition type, or null for something it has
+        /// no business choosing.
+        ///
+        /// Chaff, noisemakers, decoys and fuel tanks are all Ammunition.Type values and
+        /// none of them is a weapon anyone aims - listing them would suggest the commander
+        /// could order a ship to attack with its chaff.
+        /// </summary>
+        private static string WeaponTypeName(Ammunition.Type type)
+        {
+            switch (type)
+            {
+                case Ammunition.Type.Missile: return "Missile";
+                case Ammunition.Type.Torpedo: return "Torpedo";
+                case Ammunition.Type.Projectile: return "Gun";
+                case Ammunition.Type.ASROC: return "ASROC";
+                case Ammunition.Type.RBU: return "RBU";
+
+                // Aircraft ordnance. Listed so a strike aircraft does not report an empty
+                // magazine, but NOT selectable - the game discards the ammunition type for
+                // air units and lets the airframe pick off its own pylons.
+                case Ammunition.Type.Bomb: return "Bomb";
+                case Ammunition.Type.AerialRocket: return "Rocket";
+
+                default: return null;
+            }
+        }
         private static void ApplyReach(OwnUnit unit, ObjectBase obj)
         {
             try
@@ -551,6 +817,15 @@ namespace SeaPowerAICommander.Picture
                     if (float.IsNaN(nm) || float.IsInfinity(nm)) continue;
 
                     if (nm < best) { best = nm; bestId = u.Id; }
+
+                    // The same walk already has both numbers, so answering "who can
+                    // actually shoot this" costs nothing beyond the comparison.
+                    var reach = ReachAgainst(u, contact.Domain);
+                    if (reach > 0f && nm <= reach)
+                    {
+                        contact.UnitsInReach ??= new List<int>();
+                        contact.UnitsInReach.Add(u.Id);
+                    }
                 }
 
                 if (bestId == 0) return;
@@ -561,6 +836,33 @@ namespace SeaPowerAICommander.Picture
             catch (Exception ex)
             {
                 Plugin.Log.LogWarning($"[picture] nearest-unit range failed for contact {contact.Id}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// The reach figure that applies against a contact of this domain, or 0 when the
+        /// domain is unknown.
+        ///
+        /// An unknown domain returns 0 deliberately rather than the largest of the three.
+        /// Which reach applies is the whole question - a missile boat with 65nm against
+        /// ships and 8.6nm against aircraft is either a stand-off threat or nearly
+        /// defenceless depending entirely on what it is shooting at - so guessing here
+        /// would put a unit on the shooter list for a contact it cannot touch.
+        ///
+        /// "Land" returns 0 for the same reason and not as an oversight. Land attack is a
+        /// separate ammunition category in this game, and AntiSurfaceReachNM is built from
+        /// ASuW-targeted ordnance, so it is not the right number for a shore battery. A
+        /// land contact therefore gets no shooter list until that reach is measured
+        /// properly.
+        /// </summary>
+        private static float ReachAgainst(OwnUnit unit, string domain)
+        {
+            switch (domain)
+            {
+                case "Surface": return unit.AntiSurfaceReachNM;
+                case "Air": return unit.AirDefenceReachNM;
+                case "Subsurface": return unit.AntiSubmarineReachNM;
+                default: return 0f;
             }
         }
 
@@ -785,6 +1087,16 @@ namespace SeaPowerAICommander.Picture
                         AircraftAssigned = strike._attackAircraft != null ? strike._attackAircraft.Count : 0,
                         AgeSeconds = 0f,
                         Id = strike._id,
+
+                        // Which weapons the strike is actually going in with, which is NOT
+                        // implied by the strike type. Missile against a ship offers the
+                        // AntiShip loadouts first, but the game then picks whichever of the
+                        // pool has the most airframes available rather than the best suited
+                        // (AssigningAircraft.cs:187), so a base stocked for something else
+                        // quietly sends the wrong thing. Empty until the strike has chosen.
+                        Loadout = string.IsNullOrEmpty(strike._airstrikeChosenLoadout)
+                            ? null
+                            : strike._airstrikeChosenLoadout,
                     });
                 }
             }

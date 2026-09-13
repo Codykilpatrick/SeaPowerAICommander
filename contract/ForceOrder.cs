@@ -100,6 +100,64 @@ namespace SeaPowerAICommander.Orders
         /// strike, and it was the one move unavailable.
         /// </summary>
         LaunchAircraft,
+
+        /// <summary>
+        /// Send a unit to establish what a contact actually is.
+        ///
+        /// The commander could see that a contact was unclassified and could not do
+        /// anything about it. Every other order in this list assumes the picture is
+        /// already good enough to act on; this is the one that makes it so, and its
+        /// absence produced a deadlock that lost a GIUK interception - nothing
+        /// classified, so nothing worth striking, so nothing launched, so nothing ever
+        /// got classified.
+        ///
+        /// It is also the only way to redirect an aircraft that is already airborne.
+        /// <see cref="MoveTo"/> is refused for air units because their AI rewrites the
+        /// route every tick - but that same AI diverts to a contact the moment one is
+        /// named, because naming a target is how the game's own tasking works.
+        /// </summary>
+        IdentifyContact,
+
+        /// <summary>
+        /// Send an aircraft or helicopter home.
+        ///
+        /// Without it a deck is a one-shot asset: everything launched flies until it runs
+        /// out of fuel or ordnance and decides for itself. A fighter reporting
+        /// airDefenceReachNM 0 is an empty airframe holding a station it can no longer
+        /// defend, and recovering it is the only thing that turns it back into a sortie.
+        /// </summary>
+        ReturnToBase,
+
+        /// <summary>
+        /// Put a submarine in a depth band.
+        ///
+        /// Above or below the layer is the submarine decision in this game - the layer is
+        /// reported in every picture as conditions.layerDepth and the commander had no way
+        /// to act on it. Coarse bands rather than feet, because which side of the layer a
+        /// boat sits on is a force-level choice and the exact depth is not.
+        /// </summary>
+        SetDepth,
+
+        /// <summary>
+        /// Ping, stream the tail, or put it under the layer.
+        ///
+        /// <see cref="SetEmcon"/> deliberately leaves active sonar alone, on the grounds
+        /// that pinging is a louder decision than switching on a search radar. That was
+        /// right, and it left the whole of ASW sensor management outside the action space:
+        /// nothing could ping, nothing could stream a towed array, and nothing could put
+        /// one on the far side of the layer from the boat it was hunting.
+        /// </summary>
+        SetSonar,
+
+        /// <summary>
+        /// Reshape a formation - screen, search line, column.
+        ///
+        /// Formation geometry is force-level by definition and was the one thing at this
+        /// altitude the commander could not touch. A circular screen protects a carrier, a
+        /// line abreast sweeps for a submarine, a column transits. Spacing is deliberately
+        /// left alone: the formation keeps whatever it has.
+        /// </summary>
+        SetFormation,
     }
 
     public static class ForceOrderKinds
@@ -135,6 +193,11 @@ namespace SeaPowerAICommander.Orders
                 case ForceOrderKind.LaunchAirstrike:
                 case ForceOrderKind.SetEmcon:
                 case ForceOrderKind.LaunchAircraft:
+                case ForceOrderKind.IdentifyContact:
+                case ForceOrderKind.ReturnToBase:
+                case ForceOrderKind.SetDepth:
+                case ForceOrderKind.SetSonar:
+                case ForceOrderKind.SetFormation:
                     return false;
 
                 default:
@@ -161,8 +224,10 @@ namespace SeaPowerAICommander.Orders
         // SetWeaponStatus - "Tight" | "Free" | "Hold"
         public string WeaponStatus;
 
-        // AttackTarget / CoordinatedAttack
-        /// <summary>Contact id to engage. Must be a contact, never one of your own units.</summary>
+        // AttackTarget / CoordinatedAttack / LaunchAirstrike / IdentifyContact
+        /// <summary>
+        /// Contact this order is aimed at. Must be a contact, never one of your own units.
+        /// </summary>
         public int TargetContactId;
 
         /// <summary>How many rounds or missiles to commit. 1 if unspecified.</summary>
@@ -184,9 +249,69 @@ namespace SeaPowerAICommander.Orders
         public string Emcon;
 
         /// <summary>
+        /// LaunchAirstrike only. The weapons fit to send the strike out with, named from the
+        /// ordering unit's airstrikeLoadouts. Empty leaves the choice to the game.
+        ///
+        /// Worth naming because the game does not choose well: it takes whichever loadout in
+        /// the pool has the most airframes available rather than the one suited to the
+        /// target, so a base stocked mainly for land attack sends a land-attack fit at a
+        /// destroyer. A "Missile" strike type only puts the anti-ship loadouts at the front
+        /// of that pool; it does not insist on them.
+        ///
+        /// Refused if the deck cannot fly it. That is not pedantry - forcing an unavailable
+        /// loadout empties the candidate pool, and the strike then sits in its assigning
+        /// state for the rest of the mission without ever launching.
+        /// </summary>
+        public string Loadout;
+
+        /// <summary>
         /// LaunchAircraft only: "CAP" | "AEW" | "Recon" | "MPA" | "ASW" | "Intercept".
         /// </summary>
         public string AirMission;
+
+        /// <summary>
+        /// SetDepth only: "Surface" | "Periscope" | "Shallow" | "AboveLayer" |
+        /// "BelowLayer" | "Deep" | "VeryDeep".
+        ///
+        /// These are the game's own seven preset bands, in its own order, so the index
+        /// this maps to is the index its state machine and its UI both use.
+        /// </summary>
+        public string Depth;
+
+        /// <summary>
+        /// SetSonar only: "ActiveOn" | "ActiveOff" | "DeployTowedArray" |
+        /// "RetractTowedArray" | "TowedArrayAboveLayer" | "TowedArrayBelowLayer".
+        ///
+        /// Hull sonar and the towed array are separate decisions with opposite risk
+        /// profiles - pinging announces you, streaming a tail only slows you - so one
+        /// field spanning both is coarse by intent, not by accident.
+        /// </summary>
+        public string Sonar;
+
+        /// <summary>
+        /// SetFormation only: "Circle" | "Vic" | "Echelon" | "LineAbreast" |
+        /// "LineAstern" | "Box".
+        ///
+        /// "Loose" is NOT among them, and its absence is load-bearing: UnitFormation.Reform
+        /// has no case for it, so every station falls through with a zero offset and the
+        /// whole formation is ordered onto the leader.
+        /// </summary>
+        public string FormationPattern;
+
+        /// <summary>
+        /// AttackTarget and CoordinatedAttack: "Auto" | "Missile" | "Torpedo" | "Gun" |
+        /// "ASROC" | "RBU".
+        ///
+        /// Auto lets the unit's own weapon allocation choose, which is what every attack
+        /// did before this field existed. Naming a type only narrows the choice - the
+        /// executor still refuses to fire something the unit is not carrying, and falls
+        /// back to Auto rather than issuing an attack that quietly fires nothing.
+        ///
+        /// Ignored for aircraft: the game's own AutoAttackByClick discards the ammunition
+        /// type for air units and hands the target to the airframe's AI, which picks from
+        /// what is on the pylons.
+        /// </summary>
+        public string Weapon;
 
         /// <summary>Free text for the log. Useful when a brain should explain itself.</summary>
         public string Reason;

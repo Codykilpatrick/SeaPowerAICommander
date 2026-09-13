@@ -75,6 +75,17 @@ namespace SeaPowerAICommander
             /// <summary>Strike ids seen past AssigningAircraft, so each is counted once.</summary>
             public readonly HashSet<int> AirstrikesThatFlew = new HashSet<int>();
 
+            /// <summary>
+            /// When each strike was first seen, so its age can be reported.
+            ///
+            /// AirStrike carries no creation time of its own, and the picture was shipping
+            /// ageSeconds hardcoded to zero - so a strike that had sat in Transition for
+            /// forty minutes looked exactly like one raised on this cycle. The commander
+            /// read the state, correctly believed that state meant aircraft were committed,
+            /// and declined to order more. Twice.
+            /// </summary>
+            public readonly Dictionary<int, float> AirstrikeFirstSeen = new Dictionary<int, float>();
+
             /// <summary>Units present at the last decision, so losses can be diffed against now.</summary>
             public readonly Dictionary<int, LostUnit> KnownUnits = new Dictionary<int, LostUnit>();
 
@@ -366,6 +377,10 @@ namespace SeaPowerAICommander
                     TargetContactId = o.TargetContactId,
                     Salvo = o.Salvo,
                     CoordinationGroup = o.CoordinationGroup,
+                    Depth = NullIfEmpty(o.Depth),
+                    Sonar = NullIfEmpty(o.Sonar),
+                    FormationPattern = NullIfEmpty(o.FormationPattern),
+                    Weapon = NullIfEmpty(o.Weapon),
                     Reason = null,
                 });
             }
@@ -383,6 +398,7 @@ namespace SeaPowerAICommander
                 };
             }
 
+            DrainRefusals(picture);
             TallyAirstrikes(picture, state);
             LogUnitState(picture);
             VerifyStandingOrders(picture);
@@ -401,6 +417,7 @@ namespace SeaPowerAICommander
             {
                 case ForceOrderKind.AttackTarget:
                 case ForceOrderKind.CoordinatedAttack:
+                case ForceOrderKind.IdentifyContact:
                 case ForceOrderKind.LaunchAirstrike:
                     return true;
                 default:
@@ -480,7 +497,11 @@ namespace SeaPowerAICommander
                 Plugin.Log.LogInfo(
                     $"[units] {u.Name} ({u.Id}) {u.Category} {formation} {route} " +
                     $"{u.SpeedKnots:F0}/{u.CommandedSpeedKnots:F0}kt max{u.MaxSpeedKnots:F0} " +
-                    $"weapons={u.WeaponStatus} reach asuw={u.AntiSurfaceReachNM:F1} aaw={u.AirDefenceReachNM:F1}");
+                    $"weapons={u.WeaponStatus} reach asuw={u.AntiSurfaceReachNM:F1} aaw={u.AirDefenceReachNM:F1}" +
+                    (u.CommandedDepth != null ? $" depth={u.CommandedDepth}" : "") +
+                    (u.TowedArray != null ? $" tail={u.TowedArray}" : "") +
+                    (u.CurrentOrder != null ? $" order={u.CurrentOrder}" : "") +
+                    (u.AiState != null ? $" state={u.AiState}" : ""));
             }
 
             foreach (var c in picture.Contacts)
@@ -526,6 +547,8 @@ namespace SeaPowerAICommander
         /// </summary>
         private static void TallyAirstrikes(TacticalPicture picture, BrainState state)
         {
+            var now = GameTime.time;
+
             foreach (var strike in picture.Airstrikes)
             {
                 if (strike.AircraftAssigned > 0
@@ -533,6 +556,19 @@ namespace SeaPowerAICommander
                 {
                     state.AirstrikesThatFlew.Add(strike.Id);
                 }
+
+                // First sighting is the best creation time available - the game's AirStrike
+                // keeps none. A strike raised between two decisions therefore reads slightly
+                // young on its first appearance, which matters far less than the case this
+                // exists for: one that has been in the same state for half an hour.
+                float firstSeen;
+                if (!state.AirstrikeFirstSeen.TryGetValue(strike.Id, out firstSeen))
+                {
+                    firstSeen = now;
+                    state.AirstrikeFirstSeen[strike.Id] = firstSeen;
+                }
+
+                strike.AgeSeconds = now - firstSeen;
             }
 
             picture.AirstrikesOrdered = state.AirstrikesOrdered;
@@ -558,12 +594,156 @@ namespace SeaPowerAICommander
             return message.StartsWith(tag) ? message.Substring(tag.Length) : message;
         }
 
+        /// <summary>
+        /// Hands the commander whatever the game refused since the last decision.
+        ///
+        /// A refused order never becomes standing, so the verify pass never sees it and the
+        /// commander never learns. It just watches the effect it wanted fail to appear, and
+        /// orders the same thing again. Draining the refusals into orderProblems puts them
+        /// where it already reads failures, and clearing the list here means each is told
+        /// once rather than every cycle for the rest of the mission.
+        /// </summary>
+        private static void DrainRefusals(TacticalPicture picture)
+        {
+            if (OrderExecutor.Refusals.Count == 0) return;
+
+            foreach (var refusal in OrderExecutor.Refusals)
+            {
+                if (picture.OrderProblems.Count >= 20) break;
+                picture.OrderProblems.Add(refusal);
+            }
+
+            OrderExecutor.Refusals.Clear();
+        }
+
+        /// <summary>Empty strings serialise as noise on every replayed order; null is dropped.</summary>
+        private static string NullIfEmpty(string value)
+        {
+            return string.IsNullOrEmpty(value) ? null : value;
+        }
+
+        /// <summary>
+        /// Checks a sonar order against what the unit's sensors are actually doing.
+        ///
+        /// Only the settings with an observable in the picture are checked. RetractTowedArray
+        /// and the active-sonar pair have one; there is nothing to compare a malformed
+        /// setting against, and the executor has already refused those anyway.
+        /// </summary>
+        private static void VerifySonar(TacticalPicture picture, OwnUnit unit, ForceOrder order, ref int ignored)
+        {
+            var want = (order.Sonar ?? "").Trim().ToLowerInvariant();
+
+            switch (want)
+            {
+                case "activeon":
+                case "activeoff":
+                    var shouldBeOn = want == "activeon";
+                    if (unit.ActiveSonarOn == shouldBeOn) return;
+
+                    // activeSonarOn is the game's own flag and it is true if ANY active
+                    // sonar is radiating, a towed active array included. ActiveOff only
+                    // silences the hull set, so a ship towing an active array reads as
+                    // still pinging and would be reported as disobeying an order it
+                    // carried out. Nothing in the picture separates the two, so say
+                    // nothing rather than say something false.
+                    if (!shouldBeOn && unit.TowedArray != null) return;
+
+                    ignored++;
+                    Problem(picture,
+                        $"[verify] {unit.Name} ({unit.Id}): ordered active sonar " +
+                        $"{(shouldBeOn ? "on" : "off")} but it is {(unit.ActiveSonarOn ? "on" : "off")} - " +
+                        "order did not take");
+                    return;
+
+                case "deploytowedarray":
+                case "towedarrayabovelayer":
+                case "towedarraybelowlayer":
+                    if (unit.TowedArray == null) return;
+
+                    var wantedState = want == "towedarrayabovelayer" ? "DeployedAboveLayer"
+                        : want == "towedarraybelowlayer" ? "DeployedBelowLayer"
+                        : null;
+
+                    // A bare deploy is satisfied by either side of the layer.
+                    if (wantedState == null)
+                    {
+                        if (unit.TowedArray != "Stowed") return;
+
+                        ignored++;
+                        Problem(picture,
+                            $"[verify] {unit.Name} ({unit.Id}): ordered the towed array deployed but it is " +
+                            "stowed - order did not take");
+                        return;
+                    }
+
+                    if (string.Equals(unit.TowedArray, wantedState, StringComparison.Ordinal)) return;
+
+                    ignored++;
+                    Problem(picture,
+                        $"[verify] {unit.Name} ({unit.Id}): ordered {order.Sonar} but the towed array is " +
+                        $"{unit.TowedArray} - order did not take");
+                    return;
+
+                case "retracttowedarray":
+                    if (unit.TowedArray == null || unit.TowedArray == "Stowed") return;
+
+                    ignored++;
+                    Problem(picture,
+                        $"[verify] {unit.Name} ({unit.Id}): ordered the towed array retracted but it is " +
+                        $"{unit.TowedArray} - order did not take");
+                    return;
+            }
+        }
+
+        /// <summary>
+        /// Checks whether a unit sent to identify a contact is actually prosecuting it.
+        ///
+        /// Reported only while there is still something to find out. A unit that finished
+        /// the job is not a failure, and neither is a contact that has since dropped off the
+        /// plot - both would otherwise show up as a standing order that never worked.
+        ///
+        /// Submarines are skipped, and the reason is a wart rather than a principle: the
+        /// game's submarine identify state writes only CurrentOrderText, never the order
+        /// slot, so a boat prosecuting an identify task is indistinguishable from one
+        /// ignoring it. Every other unit type sets the slot and can be checked.
+        ///
+        /// What this DOES catch is the case worth catching: an aircraft already committed to
+        /// something else. The transitions into the identify states are reachable only from
+        /// a handful of unhurried states, so a fighter on combat air patrol never diverts
+        /// and nothing else in the picture would ever say so.
+        /// </summary>
+        private static void VerifyIdentify(
+            TacticalPicture picture,
+            Dictionary<int, Contact> contacts,
+            OwnUnit unit,
+            ForceOrder order,
+            ref int ignored)
+        {
+            if (unit.Category == "Submarine") return;
+
+            Contact target;
+            if (!contacts.TryGetValue(order.TargetContactId, out target)) return;
+            if (target.Identified) return;
+
+            if (string.Equals(unit.CurrentOrder, "Identify", StringComparison.OrdinalIgnoreCase)) return;
+
+            ignored++;
+            Problem(picture,
+                $"[verify] {unit.Name} ({unit.Id}): ordered to identify contact {order.TargetContactId} " +
+                $"but is not prosecuting it{(unit.CurrentOrder == null ? "" : $" (it is under a {unit.CurrentOrder} order)")}" +
+                $"{(unit.AiState == null ? "" : $" - its AI is in {unit.AiState}")} - " +
+                "a unit already committed to something else does not divert. Send a different one.");
+        }
+
         private static void VerifyStandingOrders(TacticalPicture picture)
         {
             if (picture.StandingOrders.Count == 0) return;
 
             var units = new Dictionary<int, OwnUnit>();
             foreach (var u in picture.OwnUnits) units[u.Id] = u;
+
+            var contacts = new Dictionary<int, Contact>();
+            foreach (var c in picture.Contacts) contacts[c.Id] = c;
 
             var ignored = 0;
 
@@ -659,6 +839,67 @@ namespace SeaPowerAICommander
                                 $"but posture is {unit.WeaponStatus} - order did not take");
                         }
                         break;
+
+                    case ForceOrderKind.SetDepth:
+                        // The band a boat holds is re-picked by its own state machine every
+                        // time that machine changes state - sprinting, drifting, prosecuting
+                        // a contact all set a depth on entry. So this is the order most
+                        // likely to have been quietly undone, and the one the commander is
+                        // least able to infer from anything else in the picture.
+                        if (!string.IsNullOrEmpty(unit.CommandedDepth)
+                            && !string.Equals(unit.CommandedDepth, order.Depth, StringComparison.OrdinalIgnoreCase))
+                        {
+                            ignored++;
+                            Problem(picture,
+                                $"[verify] {unit.Name} ({unit.Id}): ordered depth {order.Depth} but the boat " +
+                                $"is holding {unit.CommandedDepth} - its own tactical AI picks a depth on " +
+                                "every state change, so a depth order holds only until the boat next " +
+                                "changes what it is doing");
+                        }
+                        break;
+
+                    case ForceOrderKind.SetSonar:
+                        VerifySonar(picture, unit, order, ref ignored);
+                        break;
+
+                    case ForceOrderKind.SetFormation:
+                        if (!string.IsNullOrEmpty(unit.FormationPattern)
+                            && !string.Equals(unit.FormationPattern, order.FormationPattern, StringComparison.OrdinalIgnoreCase))
+                        {
+                            ignored++;
+                            Problem(picture,
+                                $"[verify] {unit.Name} ({unit.Id}): ordered formation {order.FormationPattern} " +
+                                $"but the formation is in {unit.FormationPattern} - order did not take");
+                        }
+                        break;
+
+                    case ForceOrderKind.IdentifyContact:
+                        VerifyIdentify(picture, contacts, unit, order, ref ignored);
+                        break;
+
+                    case ForceOrderKind.AttackTarget:
+                    case ForceOrderKind.CoordinatedAttack:
+                        // A standing attack order says what was ordered, not what is
+                        // happening. The unit's own engage tasks say what is happening, and
+                        // when they no longer name this contact the attack is over - the
+                        // shots went, or the tactical AI dropped it.
+                        //
+                        // Reported rather than silently retired, because "it is finished" and
+                        // "it never started" need different responses from the commander and
+                        // only it can tell them apart. Without this it read a finished attack
+                        // as an ongoing one and planned around a submarine that had long since
+                        // stopped prosecuting its contact.
+                        if (unit.EngagingContactIds != null
+                            && unit.EngagingContactIds.Contains(order.TargetContactId)) break;
+
+                        ignored++;
+                        Problem(picture,
+                            $"[verify] {unit.Name} ({unit.Id}): ordered to attack contact " +
+                            $"{order.TargetContactId} but has no live engagement against it - that " +
+                            "attack is over. It is not still prosecuting the target; order it again " +
+                            "if you want more shots, or task it elsewhere.");
+                        break;
+
                 }
             }
 

@@ -119,10 +119,11 @@ deterministic-cadence hook to patch for that.
 
 ## Current state
 
-The sidecar commander drives live missions. Its action space is nine order kinds —
+The sidecar commander drives live missions. Its action space is fourteen order kinds -
 `MoveTo`, `SetSpeed`, `SetWeaponStatus`, `SetEmcon`, `AttackTarget`, `CoordinatedAttack`,
-`Disengage`, `LaunchAirstrike`, `LaunchAircraft` — and it can be pointed at the enemy or,
-via the right-click menu, at [your own fleet](mod/README.md#delegating-your-own-fleet).
+`Disengage`, `LaunchAirstrike`, `LaunchAircraft`, `IdentifyContact`, `ReturnToBase`,
+`SetDepth`, `SetSonar`, `SetFormation` - and it can be pointed at the enemy or, via the
+right-click menu, at [your own fleet](mod/README.md#delegating-your-own-fleet).
 
 `ObservingBrain` remains the config default: it logs a one-line picture summary each tick
 and issues no orders, which verifies the tick fires and the picture reads correctly before

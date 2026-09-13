@@ -121,6 +121,7 @@ there is **no single fix** — each wants a different answer:
 | Aircraft AI states (`MPA`/`CAP`/`Intercept`/`AEW`) | waypoints wiped; routes rebuilt from `SetRelativeToStationWaypointTask` | **refuse** — `MoveTo` is rejected for air units |
 | `Vessel` `PerformingAirOps` | launching carrier ignores speed AND course | **report it** — the game is right; say so and don't fight it |
 | `Winchester` | non-player aircraft drops to Hold | **nothing** — it is out of ordnance, which the reach fields already show as 0 |
+| Submarine AI states (`Drift`/`Sprint`/`ClassifyContact`/…) | boat re-picks its depth band | **accept and report** — each state calls `setPresetDepth` on *entry*, not per tick, so an ordered band holds until the next state change; the verify pass says when it went |
 
 Two traps worth naming:
 
@@ -134,6 +135,41 @@ Two traps worth naming:
 Do not diagnose these from the decompile alone. Several confident readings were wrong —
 Winchester for player aircraft, formation speed caps, the ammunition gate on launches.
 **Read a saved picture instead** (see Testing): it shows exactly what the model got.
+
+## Orders that name a target beat orders that name a place
+
+The counterpart to the `MoveTo` refusal above, and the thing that took longest to see:
+**an aircraft cannot be given a waypoint, but it can be given a target.**
+
+The aircraft state machine transitions on tasking fields, not on routes — `Aircraft.cs:258`
+enters `IdentifySurfaceContact` off `_ai._objectToIdentify` alone, and `Aircraft.cs:318`
+enters `ReturnToBase` off `CurrentOrder.OrderType` from *any* lower-priority state. Neither
+is a position, and neither gets overwritten, because this is how the game means aircraft to
+be tasked. `IdentifyContact` is therefore both a way to improve the picture and the only way
+to put an aircraft over a chosen piece of ocean.
+
+The mechanism differs per hull type and choosing wrong is a silent no-op, not an error —
+`OrderExecutor.IdentifyContact` has the table, taken from the game's own split at
+`AI.cs:397`. Two gotchas in it:
+
+- **Submarines have no order-driven identify path at all**, and `Submarine.cs:256` gates the
+  field-driven one on `!IsPlayerObject`. A delegated player boat therefore cannot be told to
+  identify anything; the executor refuses rather than pretending.
+- **Aircraft only divert from unhurried states** (`Default`, `MPA`, `MaritimePatrol`,
+  `Loitering`). A fighter already prosecuting an air contact ignores the order. That is what
+  `currentOrder` in the picture is for, and what the verify pass checks.
+
+## `UnitFormation.Reform` has no case for `Loose`
+
+Its switch covers Vic, LineAbreast, LineAstern, Echelon, Box and Circle. `Loose` falls
+through with `vector = Vector3.zero`, which orders every station onto the leader's own
+position. The game's own context menu hides it for air units; `SetFormation` refuses it
+outright. `Convoy` is a different code path (`FormUpConvoy`) and `Battlegroup` is not a
+runtime shape.
+
+Note also that four of the six patterns read the formation's own `Spacing` field rather than
+the `spacing` argument, so passing a spacing would work for Vic and Circle and quietly not
+for the rest. `SetFormation` passes the existing spacing through for that reason.
 
 ## Patching the game's UI
 
