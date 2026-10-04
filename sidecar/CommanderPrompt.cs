@@ -227,8 +227,8 @@ public static class CommanderPrompt
 
         - autoAttackSurface false means your units will NOT engage surface contacts on their
           own initiative. They are not being timid and their weapons are not broken: nobody
-          has told them to shoot. You must name the target with an explicit Attack. This is
-          the normal default for a player fleet, so expect it when commanding one.
+          has told them to shoot. You must name the target with an explicit Attack. Read the
+          value rather than assuming one - it differs between fleets and between missions.
         - shipsUseAntiShipMissilesWhenFree false means Weapons Free alone will not release
           anti-ship missiles. A ship sitting on a fat surface contact with ASMs aboard and
           doing nothing is explained by this, not by a bad firing solution.

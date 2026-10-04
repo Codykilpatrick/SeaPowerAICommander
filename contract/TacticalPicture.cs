@@ -254,9 +254,16 @@ namespace SeaPowerAICommander.Picture
         /// <summary>
         /// Whether units engage surface contacts on their own initiative at all.
         ///
-        /// Defaults to OFF for the player's force and ON for an AI one, so a delegated
-        /// player fleet starts out declining to shoot at ships without being told to,
-        /// which looks exactly like weapons-tight timidity and is not.
+        /// Do not assume a value for this. The player force's root doctrine is read from
+        /// usersettings.ini [Tactics] - whatever the player last set in the Standing
+        /// Orders panel, plus a one-time migration of the old PlayerAutoAttackSurface
+        /// option - and only falls back to the code default when the key is absent. An AI
+        /// force gets the code default (ON) every time, because TacticalDoctrine only
+        /// consults saved settings when isRoot AND isPlayer.
+        ///
+        /// That asymmetry is the reason this field is worth its tokens: the one force
+        /// whose behaviour the commander most needs to predict is the one force whose
+        /// doctrine is unpredictable from the code.
         ///
         /// It gates AI.GetPossibleTargetsList - the auto-engage path - and NOT
         /// AI.AutoAttackByClick, which is what an Attack order goes through. So this

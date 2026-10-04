@@ -28,6 +28,13 @@ The repo is `Codykilpatrick/SeaPowerAICommander` (public). Cody owns it.
 was learned against 0.8.2 Build #358 and re-checked against 0.8.4 on 4 Oct 2026; where a
 claim has not been re-observed *in game* since, it says so.
 
+Confirmed by live run on 0.8.4, 4 Oct 2026 (*Sub Duel JMSDF 1985*, both forces driven):
+**Anchor Chain 1.1.0 still loads the plugin** despite not having been republished since
+21 Aug — it was the likeliest thing to break and it did not. Briefing attribution is
+right (`(Player, own briefing)` for the delegated fleet, `Derived` for the enemy), orders
+land (`SetSonar`, `SetDepth`, `IdentifyContact`, `SetWeaponStatus`), the doctrine block is
+populated, and prompt caching is working (17,310 of 19,565 input tokens cached).
+
 A decompile lives at `C:\Users\codyk\Documents\seapower-decomp`, and it is **a git repo
 whose history is one commit per game build**. That is the whole point of it: after an
 update, re-decompile over the top and `git diff` says exactly what moved. Decompile with
@@ -179,7 +186,7 @@ Settings that gate orders we already issue:
 
 | Doctrine setting | What it decides |
 |---|---|
-| `AutoAttackSurface` | whether a unit engages surface contacts at all. Default `!isPlayer` — so a **delegated player force defaults to not auto-attacking**. Note the gate at `AI.cs:4915` no longer tests `IsPlayerObject`; it is doctrine for everyone now |
+| `AutoAttackSurface` | whether a unit engages surface contacts at all. Note the gate at `AI.cs:4915` no longer tests `IsPlayerObject`; it is doctrine for everyone now |
 | `ShipsAutoUseAntiShipMissilesAgainstSurfaceTargets` | whether Weapons Free is enough to release ASMs |
 | `ShipsAutoUseSAMsAgainstSurfaceTargets` | SAMs against surface targets |
 | `ShipsOnWeaponsTightEngageHostileAircraft` | flipped to **off** by default in 0.8.3 — Tight now means more Tight than it did |
@@ -192,6 +199,16 @@ Settings that gate orders we already issue:
 `PlayerAutoAttackSurface` is **gone** — `OptionsManager` migrates it once into
 `[Tactics] AutoAttackSurface` and deletes the old key. Anything looking for the old option
 finds nothing and reads `false`.
+
+**Do not predict a doctrine value from the code defaults.** `ReadRootPlayerDoctrineValue`
+returns the hardcoded default unless `isRoot && isPlayer`, in which case it reads
+`usersettings.ini [Tactics]`. So an AI force always gets code defaults, while the player's
+force gets whatever that machine's Standing Orders panel was last set to — including the
+migrated old option. This was got wrong once already: `AutoAttackSurface` has a code
+default of `!isPlayer`, which reads as "off for the player", and the first live 0.8.4 run
+reported `true` because the player had the old option switched on. The asymmetry is the
+argument for carrying doctrine in the picture at all: the one force whose behaviour the
+commander most needs to predict is the one whose doctrine the code cannot tell you.
 
 Two consequences, and they are different:
 
