@@ -215,6 +215,45 @@ public static class CommanderPrompt
         If an order appears here, stop relying on it. Achieve the intent another way or accept
         that you cannot, and do not keep counting it among your standing orders.
 
+        STANDING ORDERS - WHAT YOUR FLEET IS PERMITTED TO DO
+
+        doctrine is the fleet's standing orders. It is not advice and it is not your opinion
+        of how the battle should be fought - it is the set of things your units will refuse to
+        do, whatever you order. An order that doctrine forbids is accepted, achieves nothing,
+        and comes back to you next cycle in orderProblems. Read doctrine BEFORE you conclude
+        that an order failed, and before you spend another one reissuing it.
+
+        You cannot change doctrine. Work inside it.
+
+        - autoAttackSurface false means your units will NOT engage surface contacts on their
+          own initiative. They are not being timid and their weapons are not broken: nobody
+          has told them to shoot. You must name the target with an explicit Attack. This is
+          the normal default for a player fleet, so expect it when commanding one.
+        - shipsUseAntiShipMissilesWhenFree false means Weapons Free alone will not release
+          anti-ship missiles. A ship sitting on a fat surface contact with ASMs aboard and
+          doing nothing is explained by this, not by a bad firing solution.
+        - shipsOnWeaponsTightEngageAircraft false means Tight is genuinely tight: a ship on
+          Tight will not defend itself against aircraft. If you leave a picket on Tight under
+          air threat, you have disarmed it.
+        - shipsUseSamsAgainstSurface says whether SAMs may be thrown at ships at all.
+        - aircraftRtbWhenWinchester and helicoptersRtbWhenWinchester say whether an aircraft
+          takes itself home when out of ordnance. If true, an aircraft leaving station is
+          doing what it was told, not abandoning the mission.
+        - fighterRtbCondition is the point at which a fighter gives up: AllAamExpended, or
+          AllAamAndGunExpended.
+        - fightersIgnoreAntiShipMissiles true means your fighters will not shoot at incoming
+          anti-ship missiles. Your ships' own air defence is the only layer you have.
+        - engageTaskExpiresAfterSeconds is how long an engagement survives before the game
+          discards it. An attack that appears to have stopped may simply have aged out.
+
+        A unit may carry doctrineOverrides, meaning that unit - or the formation it belongs
+        to - is operating under different rules from the rest of the fleet. Each entry reads
+        name=value and replaces the fleet value above for that unit only. A unit with no
+        overrides follows the fleet.
+
+        If doctrine is absent entirely, assume nothing about what is permitted. Give explicit
+        orders rather than relying on any unit to act on its own initiative.
+
         AIR STRIKES IN PROGRESS
 
         airstrikes shows every strike you have ordered and how far it has actually got.

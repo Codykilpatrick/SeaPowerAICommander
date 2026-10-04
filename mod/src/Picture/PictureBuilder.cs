@@ -48,6 +48,10 @@ namespace SeaPowerAICommander.Picture
                 Objective = Plugin.ForceObjective,
             };
 
+            // Before the units: AddOwnUnits compares each unit's doctrine against the
+            // force's to find overrides, so the force's has to be resolved first.
+            ApplyDoctrine(picture, tf);
+
             AddOwnUnits(picture, tf._taskforceVessels, "Vessel");
             AddOwnUnits(picture, tf._taskforceSubmarines, "Submarine");
             AddOwnUnits(picture, tf._taskforceAircraft, "Aircraft");
@@ -258,6 +262,113 @@ namespace SeaPowerAICommander.Picture
             return new GeoPosition(lat / count, lon / count);
         }
 
+        /// <summary>
+        /// The force's Standing Orders, resolved.
+        ///
+        /// Taskforce.TacticalDoctrine is the root of the chain, built in the task force's
+        /// own constructor, so it always exists. Everything below it resolves upward into
+        /// this, which is why reading it once per picture is enough to describe the
+        /// default every unit is operating under.
+        /// </summary>
+        private static void ApplyDoctrine(TacticalPicture picture, Taskforce tf)
+        {
+            try
+            {
+                var d = tf.TacticalDoctrine;
+                if (d == null) return;
+
+                picture.Doctrine = ReadDoctrine(d);
+            }
+            catch (Exception ex)
+            {
+                // Leave it null rather than half-built. A ForceDoctrine with default
+                // values would read as "everything is permitted", which is the one
+                // answer that cannot be recovered from downstream.
+                picture.Doctrine = null;
+                Plugin.Log.LogWarning(
+                    $"[picture] doctrine unreadable for {picture.TaskforceName}: {ex.Message}");
+            }
+        }
+
+        private static ForceDoctrine ReadDoctrine(TacticalDoctrine d)
+        {
+            return new ForceDoctrine
+            {
+                AutoAttackSurface = d.AutoAttackSurface.ResolvedValue,
+                ShipsUseAntiShipMissilesWhenFree =
+                    d.ShipsAutoUseAntiShipMissilesAgainstSurfaceTargets.ResolvedValue,
+                ShipsUseSamsAgainstSurface = d.ShipsAutoUseSAMsAgainstSurfaceTargets.ResolvedValue,
+                ShipsOnWeaponsTightEngageAircraft = d.ShipsOnWeaponsTightEngageHostileAircraft.ResolvedValue,
+                AircraftRtbWhenWinchester = d.PlanesWinchester.ResolvedValue,
+                HelicoptersRtbWhenWinchester = d.HelicoptersWinchester.ResolvedValue,
+                FighterRtbCondition = d.FighterRtbCondition.ResolvedValue.ToString(),
+                FightersIgnoreAntiShipMissiles = d.FightersDoNotEngageAntiShipMissiles.ResolvedValue,
+                EngageTaskExpiresAfterSeconds = d.RemoveEngageTaskAfter.ResolvedValue,
+            };
+        }
+
+        /// <summary>
+        /// Where a unit's own doctrine departs from the force's.
+        ///
+        /// Doctrine resolves unit over formation over force, so this catches an override
+        /// set at either level without needing to know which. Comparing resolved values
+        /// rather than inspecting IsSet is deliberate: the question the commander needs
+        /// answered is "does this unit behave differently", not "where was the box
+        /// ticked".
+        ///
+        /// ObjectBase.TacticalDoctrine builds its view models on first access. That is not
+        /// a cost this adds - the game's own auto-attack path touches the same property
+        /// per unit (AI.cs:4915) - but it does throw for a unit whose UnitTaskforce is
+        /// null, which is why the guard is per unit. One malformed unit must not take the
+        /// overrides off every other unit in the force.
+        /// </summary>
+        private static void ApplyDoctrineOverrides(OwnUnit unit, ObjectBase obj, ForceDoctrine force)
+        {
+            if (force == null) return;
+
+            try
+            {
+                var d = obj.TacticalDoctrine;
+                if (d == null) return;
+
+                var mine = ReadDoctrine(d);
+                List<string> diffs = null;
+
+                void Compare(string name, object ours, object theirs)
+                {
+                    if (Equals(ours, theirs)) return;
+                    if (diffs == null) diffs = new List<string>();
+                    diffs.Add(name + "=" + ours);
+                }
+
+                Compare("autoAttackSurface", mine.AutoAttackSurface, force.AutoAttackSurface);
+                Compare("shipsUseAntiShipMissilesWhenFree",
+                    mine.ShipsUseAntiShipMissilesWhenFree, force.ShipsUseAntiShipMissilesWhenFree);
+                Compare("shipsUseSamsAgainstSurface",
+                    mine.ShipsUseSamsAgainstSurface, force.ShipsUseSamsAgainstSurface);
+                Compare("shipsOnWeaponsTightEngageAircraft",
+                    mine.ShipsOnWeaponsTightEngageAircraft, force.ShipsOnWeaponsTightEngageAircraft);
+                Compare("aircraftRtbWhenWinchester",
+                    mine.AircraftRtbWhenWinchester, force.AircraftRtbWhenWinchester);
+                Compare("helicoptersRtbWhenWinchester",
+                    mine.HelicoptersRtbWhenWinchester, force.HelicoptersRtbWhenWinchester);
+                Compare("fighterRtbCondition", mine.FighterRtbCondition, force.FighterRtbCondition);
+                Compare("fightersIgnoreAntiShipMissiles",
+                    mine.FightersIgnoreAntiShipMissiles, force.FightersIgnoreAntiShipMissiles);
+                Compare("engageTaskExpiresAfterSeconds",
+                    mine.EngageTaskExpiresAfterSeconds, force.EngageTaskExpiresAfterSeconds);
+
+                // Null, not an empty list: the wire format drops nulls, and most units in
+                // most forces have nothing to say here.
+                unit.DoctrineOverrides = diffs;
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.LogWarning(
+                    $"[picture] doctrine unreadable for unit {unit.Name}: {ex.Message}");
+            }
+        }
+
         private static void AddOwnUnits(TacticalPicture picture, List<ObjectBase> units, string category)
         {
             if (units == null) return;
@@ -309,6 +420,7 @@ namespace SeaPowerAICommander.Picture
                 ApplyAiState(unit, obj);
                 ApplyAlert(unit, obj);
                 ApplyEngagements(unit, obj);
+                ApplyDoctrineOverrides(unit, obj, picture.Doctrine);
 
                 picture.OwnUnits.Add(unit);
             }

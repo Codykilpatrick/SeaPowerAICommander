@@ -23,6 +23,22 @@ namespace SeaPowerAICommander.Picture
         public bool IsOnAlert;
 
         /// <summary>
+        /// The standing orders this force is operating under - the game's own doctrine
+        /// layer, resolved at task-force level.
+        ///
+        /// This is not advice to the commander, it is the set of things the game will
+        /// refuse to do no matter what it orders. An order that doctrine forbids is
+        /// accepted by the executor, carried out by nobody, and then reported by the
+        /// verify pass as "did not take" - which reaches the commander as an instruction
+        /// to try again. Without this field the commander cannot tell a gate from a
+        /// failure, and reissues forever.
+        ///
+        /// Null when the doctrine could not be read; the commander is told to assume
+        /// nothing in that case rather than assume permission.
+        /// </summary>
+        public ForceDoctrine Doctrine;
+
+        /// <summary>
         /// What this force is trying to achieve.
         ///
         /// Without one, self-preservation is the only rational policy and withdrawal is
@@ -217,6 +233,69 @@ namespace SeaPowerAICommander.Picture
 
         /// <summary>Vessel / Submarine / Aircraft / Helicopter / LandUnit.</summary>
         public string Category;
+    }
+
+    /// <summary>
+    /// The game's Standing Orders, as they resolve for this task force.
+    ///
+    /// Sea Power 0.8.3 introduced a doctrine layer - global, then formation, then unit,
+    /// each overriding the one above - that decides whether a unit is ALLOWED to do the
+    /// thing it has been ordered to do. It is entirely invisible from the order path:
+    /// the executor accepts, the unit does nothing, and nothing anywhere reports a
+    /// refusal.
+    ///
+    /// Only the settings that gate an order this commander can actually issue are carried.
+    /// The telegraph settings are deliberately absent - they decide the speed the tactical
+    /// AI picks when it has NOT been told, so an explicit SetSpeed overrides them and they
+    /// gate nothing.
+    /// </summary>
+    public class ForceDoctrine
+    {
+        /// <summary>
+        /// Whether units engage surface contacts on their own initiative at all.
+        ///
+        /// Defaults to OFF for the player's force and ON for an AI one, so a delegated
+        /// player fleet starts out declining to shoot at ships without being told to,
+        /// which looks exactly like weapons-tight timidity and is not.
+        ///
+        /// It gates AI.GetPossibleTargetsList - the auto-engage path - and NOT
+        /// AI.AutoAttackByClick, which is what an Attack order goes through. So this
+        /// being false does not disarm the force: it means the commander has to name
+        /// every target instead of leaving ships to find their own. That distinction is
+        /// the whole value of carrying the field, so do not let it get lost.
+        /// </summary>
+        public bool AutoAttackSurface;
+
+        /// <summary>Whether Weapons Free is enough to release anti-ship missiles.</summary>
+        public bool ShipsUseAntiShipMissilesWhenFree;
+
+        /// <summary>Whether ships will put SAMs onto surface targets.</summary>
+        public bool ShipsUseSamsAgainstSurface;
+
+        /// <summary>
+        /// Whether a ship on Weapons Tight still engages hostile aircraft. 0.8.3 flipped
+        /// this to OFF by default, so Tight now means considerably more tight than the
+        /// behaviour most of this prompt's advice was written against.
+        /// </summary>
+        public bool ShipsOnWeaponsTightEngageAircraft;
+
+        /// <summary>Whether aircraft return to base once out of ordnance.</summary>
+        public bool AircraftRtbWhenWinchester;
+
+        /// <summary>Whether helicopters return to base once out of ordnance.</summary>
+        public bool HelicoptersRtbWhenWinchester;
+
+        /// <summary>AllAamExpended / AllAamAndGunExpended - when a fighter gives up and goes home.</summary>
+        public string FighterRtbCondition;
+
+        /// <summary>Whether fighters decline to shoot at anti-ship missiles.</summary>
+        public bool FightersIgnoreAntiShipMissiles;
+
+        /// <summary>
+        /// How long an engage task survives before the game discards it, in seconds.
+        /// An attack that looks abandoned may simply have aged out.
+        /// </summary>
+        public int EngageTaskExpiresAfterSeconds;
     }
 
     public class OwnUnit
@@ -537,6 +616,16 @@ namespace SeaPowerAICommander.Picture
 
         public float HeadingDeg;
         public float MaxSpeedKnots;
+
+        /// <summary>
+        /// Where this unit's standing orders differ from the force's, as "name=value".
+        ///
+        /// Doctrine resolves unit over formation over force, so a single ship or a single
+        /// formation can be operating under rules nothing else in the fleet is. Null -
+        /// not empty - when the unit simply follows the force, which is the normal case
+        /// and should cost nothing to say.
+        /// </summary>
+        public List<string> DoctrineOverrides;
     }
 
     /// <summary>One airframe type sitting on a flight deck, and how many of it.</summary>

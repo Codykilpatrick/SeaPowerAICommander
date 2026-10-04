@@ -203,8 +203,28 @@ Two consequences, and they are different:
   project is premised on, and it is writable. Several rows in the table above are
   workarounds for the absence of precisely this.
 
-Neither has been acted on yet. Decide the risk side first: the picture should carry the
-resolved doctrine before the commander is asked to reason about it.
+The risk side is handled: `TacticalPicture.Doctrine` carries the nine settings that gate
+an order the commander can actually issue, and `OwnUnit.DoctrineOverrides` names the
+settings where a unit or its formation departs from the force. Overrides are found by
+comparing the unit's `ResolvedValue` against the force's rather than inspecting `IsSet` —
+the question is "does this unit behave differently", not "where was the box ticked" — and
+the field is left **null**, not empty, when it does not, because most units in most forces
+have nothing to say and the wire format drops nulls.
+
+Two things to keep straight when extending it:
+
+- **`AutoAttackSurface` gates `AI.GetPossibleTargetsList`, not `AI.AutoAttackByClick`.**
+  Auto-engagement stops; an explicit `Attack` order still works, because that is the path
+  `OrderExecutor` and `AttackScheduler` both use. So `false` does not disarm a force — it
+  means the commander must name every target. Reading it as "cannot shoot" would be the
+  same class of mistake as reading `airDefenceReachNM == 0` as "incapable".
+- **Telegraph settings are deliberately absent from the picture.** They decide the speed
+  the tactical AI picks when it has *not* been told, so an explicit `SetSpeed` overrides
+  them and they gate nothing. Carrying them would cost tokens every cycle to describe a
+  default the commander already overrides.
+
+The writable side has **not** been acted on. Nothing sets doctrine; the prompt tells the
+commander to work inside it.
 
 ## Orders that name a target beat orders that name a place
 

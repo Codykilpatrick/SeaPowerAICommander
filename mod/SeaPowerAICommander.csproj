@@ -47,6 +47,13 @@
       <Private>false</Private>
     </Reference>
 
+    <!-- TacticalDoctrine - the Standing Orders model the picture reads - derives from
+         CommunityToolkit's ObservableObject, so naming the type at all needs this. -->
+    <Reference Include="CommunityToolkit.Mvvm">
+      <HintPath>$(GameManagedDir)\CommunityToolkit.Mvvm.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+
     <!-- The game already ships Newtonsoft.Json. Using it avoids pulling
          System.Text.Json and its BCL dependency tree into Unity's Mono runtime. -->
     <Reference Include="Newtonsoft.Json">
@@ -92,7 +99,9 @@
   </ItemGroup>
 
   <!--
-    Deploy straight into BepInEx/plugins so a rebuild is ready on next game launch.
+    Deploy into StreamingAssets - NOT BepInEx/plugins - because Anchor Chain finds mods
+    by scanning the game's own mod search paths, so a dev build installs exactly like a
+    Workshop item and appears in the mod menu.
     Sea Power cannot hot-reload code mods - you must fully restart the game.
     Skip with: dotnet build -p:DeployToGame=false
   -->
