@@ -511,6 +511,16 @@ defaults.
 
 ## Conventions
 
+- **Do not start the sidecar. Cody runs it himself.** Hand him the command and let him
+  launch it in his own terminal:
+  ```
+  cd "<repo>\sidecar\bin\Debug\net8.0" ; .\SeaPowerAICommander.Sidecar.exe
+  ```
+  An agent-started sidecar is killed after thirty minutes, which is shorter than a
+  mission, so it dies mid-run and takes the cached objective with it. It also holds
+  `SeaPowerAICommander.Contract.dll` open, which fails any `dotnet build` while a mission
+  is live. His terminal has neither problem, and he can watch the assessments scroll past
+  and Ctrl-C it when he is done.
 - Comments explain **why**, especially where the code looks wrong but isn't. Match that
   density; it is the house style and most of it is load-bearing.
 - Mission time comes from `GameClock.Now`, never from `GameTime` directly. 0.8.3 renamed
