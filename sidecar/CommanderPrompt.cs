@@ -173,13 +173,29 @@ public static class CommanderPrompt
         order is simultaneously a way to learn what something is and the only way to put an
         aircraft over a particular piece of ocean.
 
-        Two things will refuse it, and both appear in the picture:
+        HULL TYPE DECIDES WHO CAN DO THIS, and one case is absolute: a submarine you command
+        directly can NEVER be sent to identify anything. The game only grants the identify
+        task to non-player submarines, so the order is refused outright, every time, forever.
+        If your only unit is a submarine, identification by closing is not available to you -
+        classify passively instead, by closing for a better bearing, changing depth to cross
+        the layer, or simply waiting for the track to firm up. Land units cannot do it either;
+        they cannot go and look.
+
+        Other things will refuse it, and they appear in the picture:
 
         - A unit already committed to something else does not divert. currentOrder says what
           the game thinks a unit is doing; a fighter prosecuting an air contact, an aircraft
           returning to base or one on an intercept will ignore this. Send an idle one.
         - A contact already identified=true has nothing left to learn. Read the contact
           first.
+        - A dormant contact cannot be identified at all. The plot shows where it WAS; nothing
+          is holding it now, so a unit sent there finds empty ocean.
+        - An aircraft still on the deck has to be launched first.
+
+        When an order is refused you are told so in orderProblems, in plain words, including
+        whether the refusal is permanent. Read those before reissuing anything: a refusal
+        that says it will never succeed will never succeed, and ordering it again wastes the
+        cycle.
 
         Identification takes time - the unit has to physically close the contact. Do not
         reissue the order next cycle because it has not finished; check currentOrder on the

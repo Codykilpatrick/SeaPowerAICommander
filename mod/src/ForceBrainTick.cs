@@ -1017,6 +1017,29 @@ namespace SeaPowerAICommander
                             break;
                         }
 
+                        // A state that writes its own speed has taken the throttle, and
+                        // that is NOT the same as the order having failed. Claiming
+                        // _hasExplicitSpeedOrder only stops Submarine.ApplyAiTransitSpeed;
+                        // it does nothing about a state calling SetSpeedCommand directly on
+                        // entry, which Drift does (SubmarineStates/Drift.cs:67,121-144).
+                        //
+                        // Reported as a failure, this behaves exactly like the depth case:
+                        // the commander reissues, the next state change overrides it again,
+                        // and the pair of them loop for the rest of the mission. Two boats
+                        // did precisely that, four problems a cycle, every cycle.
+                        if (unit.SpeedOverriddenByAi)
+                        {
+                            ignored++;
+                            Problem(picture,
+                                $"[verify] {unit.Name} ({unit.Id}): ordered {order.SpeedKnots:F0}kt but " +
+                                $"its own AI has taken the throttle and is holding " +
+                                $"{unit.CommandedSpeedKnots:F0}kt - a unit picks its own speed on every " +
+                                "state change, so a speed order holds only until it next changes what " +
+                                "it is doing. REISSUING WILL NOT HELP. If the speed matters, change " +
+                                "what the unit is doing instead.");
+                            break;
+                        }
+
                         ignored++;
                         Problem(picture,
                             $"[verify] {unit.Name} ({unit.Id}): ordered {order.SpeedKnots:F0}kt " +

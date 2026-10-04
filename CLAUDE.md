@@ -147,7 +147,8 @@ there is **no single fix** — each wants a different answer:
 | Mechanism | Symptom | Right response |
 |---|---|---|
 | `CheckForPlayerAbort` | any `IsPlayerObject` unit reverts weapons Free→Tight on reaching a waypoint | **suppress** — `PlayerAbortGuard`, scoped to delegated forces only |
-| `Submarine.ApplyAiTransitSpeed` | boat re-picks its own speed every tick | **claim the flag** — set `_hasExplicitSpeedOrder`, as the game's waypoint task does |
+| `Submarine.ApplyAiTransitSpeed` | boat re-picks its own speed every tick | **claim the flag** — set `_hasExplicitSpeedOrder`, as the game's waypoint task does. This is only HALF the story: see the speed row below |
+| AI states writing speed directly (`Drift`, formation states, evasion) | commanded speed is not what was ordered, and `_hasExplicitSpeedOrder` did not stop it | **accept and report** — the flag only gates `ApplyAiTransitSpeed`; `SubmarineStates/Drift.cs:67,121-144` calls `setTelegraph` and `SetSpeedCommand` directly on entry. The game sets `_isSpeedCommandOverridesInfo` when a state takes the throttle and clears it on exit, so read that and say the throttle was taken rather than that the order failed |
 | Aircraft AI states (`MPA`/`CAP`/`Intercept`/`AEW`) | waypoints wiped; routes rebuilt from `SetRelativeToStationWaypointTask` | **refuse** — `MoveTo` is rejected for air units |
 | `Vessel` `PerformingAirOps` | launching carrier ignores speed AND course | **report it** — the game is right; say so and don't fight it |
 | `Winchester` | non-player aircraft drops to Hold | **nothing** — it is out of ordnance, which the reach fields already show as 0. As of 0.8.4 this is doctrine, not a constant: `PlanesWinchester` / `HelicoptersWinchester`, defaulting to `!isPlayer` |
@@ -303,6 +304,18 @@ The commander did as it was told every time: reassigned units that were already 
 job, and reissued orders that had landed. `BrainState.OrderIssuedAt` plus `GraceSeconds`
 now hold each check back until the thing could plausibly have happened. **When you add a
 verify case, give it a grace, and take the number from an observed run rather than taste.**
+
+**A refusal is not a verify failure, and the commander needs both.** `orderProblems` is the
+verify pass over orders that were ACCEPTED and became standing. An order the executor
+refuses never becomes standing, so it can never appear there — which means that unless the
+refusal is routed through `OrderExecutor.Refuse`, the commander learns nothing and reissues
+forever. One mission issued fifteen `IdentifyContact` orders to a delegated player
+submarine, which structurally cannot take one, and four `SetSonar` towed-array orders to a
+boat with no array: nineteen refused against eighteen accepted, every refusal in the log,
+`orderProblems` empty the whole time. `Refuse` now logs as well as recording, so there is
+no reason for a refusal path to call `Plugin.Log` directly — **if you add a `return false`
+to an order handler, route it through `Refuse`**, and write the message for the commander:
+what it cannot do, what to do instead, and whether the refusal is permanent.
 
 Two specific traps inside it:
 

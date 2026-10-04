@@ -34,9 +34,23 @@ namespace SeaPowerAICommander.Orders
         ///
         /// Bounded, because an unbounded list would grow all mission if nothing drained it,
         /// and because twenty problems is already more than a commander can act on.
+        ///
+        /// This logs as well as recording, and that is the whole point of routing every
+        /// refusal through here. Sites that only called Plugin.Log left the commander
+        /// blind: a single mission issued fifteen IdentifyContact orders to a delegated
+        /// player submarine, which structurally cannot take one, and four SetSonar orders
+        /// to a boat with no towed array. All nineteen were refused, every refusal went to
+        /// the log, orderProblems stayed empty, and the commander reissued every cycle
+        /// because nothing ever told it otherwise. Nineteen refused against eighteen
+        /// accepted, in one mission.
+        ///
+        /// So: a refusal is not a log line with a list on the side. Write the message for
+        /// the COMMANDER - say what it cannot do and what to do instead - and let the log
+        /// take the same words.
         /// </summary>
         internal static void Refuse(string message)
         {
+            Plugin.Log.LogWarning($"[orders] refused: {message}");
             if (Refusals.Count < 20) Refusals.Add(message);
         }
 
@@ -94,7 +108,10 @@ namespace SeaPowerAICommander.Orders
                 {
                     // Not ours, sunk between the picture being sent and the orders coming
                     // back, or hallucinated. Never trust the id.
-                    Plugin.Log.LogWarning($"[orders] rejected {order.Kind} - unit {order.UnitId} not in {tf._nameInMissionFile}");
+                    Refuse(
+                        $"{order.Kind} was not carried out: unit {order.UnitId} is not in this task " +
+                        "force. It may have been lost since the picture was taken, or the id may be " +
+                        "wrong. Order only units listed in ownUnits.");
                     rejected++;
                     continue;
                 }
@@ -210,7 +227,7 @@ namespace SeaPowerAICommander.Orders
                     return SetFormation(unit, order);
 
                 default:
-                    Plugin.Log.LogWarning($"[orders] unknown kind {order.Kind}");
+                    Refuse($"{order.Kind} is not an order this executor can carry out.");
                     return false;
             }
         }
@@ -238,16 +255,19 @@ namespace SeaPowerAICommander.Orders
             if (order.Latitude < -90.0 || order.Latitude > 90.0 ||
                 order.Longitude < -180.0 || order.Longitude > 180.0)
             {
-                Plugin.Log.LogWarning($"[orders] MoveTo out of range: {order.Latitude},{order.Longitude}");
+                Refuse(
+                    $"MoveTo was refused: {order.Latitude},{order.Longitude} is not a point on the " +
+                    "globe. Give latitude between -90 and 90 and longitude between -180 and 180.");
                 return false;
             }
 
             if (unit is Aircraft || unit is Helicopter)
             {
-                Plugin.Log.LogWarning(
-                    $"[orders] MoveTo refused for air unit {unit.getName()} ({unit.UniqueID}): " +
-                    "aircraft fly their tasking, not waypoints - their AI state rewrites the " +
-                    "route every tick. Retask or reposition the parent instead.");
+                Refuse(
+                    $"{unit.getName()} ({unit.UniqueID}) cannot be given a waypoint: aircraft fly " +
+                    "their tasking, not routes, and their AI state rewrites the route every tick. " +
+                    "Name a TARGET instead - IdentifyContact, LaunchAirstrike or ReturnToBase - or " +
+                    "reposition the parent it is stationed on.");
                 return false;
             }
 
@@ -314,7 +334,7 @@ namespace SeaPowerAICommander.Orders
         {
             if (order.SpeedKnots < 0f)
             {
-                Plugin.Log.LogWarning($"[orders] negative speed {order.SpeedKnots}");
+                Refuse($"SetSpeed was refused: {order.SpeedKnots} is not a speed. Order knots, not less than zero.");
                 return false;
             }
 
@@ -405,7 +425,9 @@ namespace SeaPowerAICommander.Orders
 
             if (unit._ai == null)
             {
-                Plugin.Log.LogWarning($"[orders] {order.Kind}: {unit.getName()} has no AI to engage with");
+                Refuse(
+                    $"{unit.getName()} ({unit.UniqueID}) cannot be told to engage anything - it has " +
+                    "no tactical AI to fire with.");
                 return false;
             }
 
@@ -420,7 +442,6 @@ namespace SeaPowerAICommander.Orders
                     $"{unit.getName()} ({unit.UniqueID}) did NOT fire on contact {order.TargetContactId} - " +
                     $"the game declined the engagement. {DescribeEngagement(unit, target, ammo)}";
 
-                Plugin.Log.LogWarning($"[orders] {order.Kind}: {why}");
                 Refuse(why);
                 return false;
             }
@@ -697,7 +718,9 @@ namespace SeaPowerAICommander.Orders
 
             if (unit._ai == null)
             {
-                Plugin.Log.LogWarning($"[orders] LaunchAirstrike: {unit.getName()} has no AI");
+                Refuse(
+                    $"{unit.getName()} ({unit.UniqueID}) cannot mount an air strike - it has no " +
+                    "tactical AI to run one.");
                 return false;
             }
 
@@ -728,7 +751,6 @@ namespace SeaPowerAICommander.Orders
                             ? "it has no airstrike loadouts available at all"
                             : $"what it can fly is: {have}");
 
-                    Plugin.Log.LogWarning($"[orders] LaunchAirstrike: {why}");
                     Refuse(why);
                     return false;
                 }
@@ -897,8 +919,9 @@ namespace SeaPowerAICommander.Orders
             var target = ResolveContact(tf, order.TargetContactId);
             if (target == null)
             {
-                Plugin.Log.LogWarning(
-                    $"[orders] IdentifyContact: contact {order.TargetContactId} not held by this task force");
+                Refuse(
+                    $"contact {order.TargetContactId} was NOT identified: this task force is not " +
+                    "holding that track. Name a contact that is in your picture.");
                 return false;
             }
 
@@ -907,8 +930,10 @@ namespace SeaPowerAICommander.Orders
             var veh = target.GetMapVehicle(tf);
             if (veh != null && veh.Identified != null && veh.Identified.Value)
             {
-                Plugin.Log.LogWarning(
-                    $"[orders] IdentifyContact: contact {order.TargetContactId} is already identified");
+                Refuse(
+                    $"contact {order.TargetContactId} was NOT re-tasked for identification: it is " +
+                    "already identified, so there is nothing left to learn. Check identified on the " +
+                    "contact before spending an order on it.");
                 return false;
             }
 
@@ -943,8 +968,9 @@ namespace SeaPowerAICommander.Orders
             // to look at it in any case.
             if (unit is LandUnit)
             {
-                Plugin.Log.LogWarning(
-                    $"[orders] IdentifyContact: {unit.getName()} is a land unit - it cannot go and look");
+                Refuse(
+                    $"{unit.getName()} ({unit.UniqueID}) cannot identify anything: it is a land unit " +
+                    "and cannot close a contact to look at it. Send a ship, helicopter or aircraft.");
                 return false;
             }
 
@@ -952,8 +978,9 @@ namespace SeaPowerAICommander.Orders
             // deck - accepted, and then nothing happens.
             if (!IsAirborneIfAir(unit))
             {
-                Plugin.Log.LogWarning(
-                    $"[orders] IdentifyContact: {unit.getName()} is not airborne - launch it first");
+                Refuse(
+                    $"{unit.getName()} ({unit.UniqueID}) cannot be sent to identify a contact while it " +
+                    "is still on the deck. Launch it first, then task it.");
                 return false;
             }
 
@@ -961,7 +988,9 @@ namespace SeaPowerAICommander.Orders
             {
                 if (unit._ai == null)
                 {
-                    Plugin.Log.LogWarning($"[orders] IdentifyContact: {unit.getName()} has no AI to task");
+                    Refuse(
+                        $"{unit.getName()} ({unit.UniqueID}) cannot be tasked to identify anything - " +
+                        "it has no tactical AI to carry the order.");
                     return false;
                 }
 
@@ -995,10 +1024,13 @@ namespace SeaPowerAICommander.Orders
                 // cannot fire.
                 if (unit is Submarine && unit.IsPlayerObject && !DM._subAIAppliesToPlayer)
                 {
-                    Plugin.Log.LogWarning(
-                        $"[orders] IdentifyContact refused for {unit.getName()}: the game only lets " +
-                        "NON-player submarines prosecute an identify task. Send a ship, a helicopter " +
-                        "or an aircraft instead.");
+                    Refuse(
+                        $"{unit.getName()} ({unit.UniqueID}) cannot be sent to identify anything, " +
+                        "ever: the game only lets NON-player submarines prosecute an identify task. " +
+                        "This will never succeed, so do not order it again for this boat. Classify " +
+                        "passively instead - close for a better bearing, change depth to cross the " +
+                        "layer, or wait for the track to firm up - or send a ship, helicopter or " +
+                        "aircraft if you have one.");
                     return false;
                 }
 
@@ -1014,9 +1046,9 @@ namespace SeaPowerAICommander.Orders
             // refusal rather than as an order that vanished.
             if (unit._obp == null || unit._obp._visualSensors == null || unit._obp._visualSensors.Count == 0)
             {
-                Plugin.Log.LogWarning(
-                    $"[orders] IdentifyContact: {unit.getName()} has no visual sensors - it cannot " +
-                    "make a visual identification");
+                Refuse(
+                    $"{unit.getName()} ({unit.UniqueID}) cannot make a visual identification: it " +
+                    "carries no visual sensors. Send something with eyes.");
                 return false;
             }
 
@@ -1147,7 +1179,9 @@ namespace SeaPowerAICommander.Orders
 
             if (!IsAirborneIfAir(unit))
             {
-                Plugin.Log.LogWarning($"[orders] ReturnToBase: {unit.getName()} is already on deck");
+                Refuse(
+                    $"{unit.getName()} ({unit.UniqueID}) was not sent home: it is already on the deck. " +
+                    "It is not airborne, so there is nothing to recover.");
                 return false;
             }
 
@@ -1260,8 +1294,11 @@ namespace SeaPowerAICommander.Orders
                 case "towedarraybelowlayer":
                     if (!unit.HasTowedSonar())
                     {
-                        Plugin.Log.LogWarning(
-                            $"[orders] SetSonar {order.Sonar}: {unit.getName()} has no towed array");
+                        Refuse(
+                            $"{unit.getName()} ({unit.UniqueID}) has NO TOWED ARRAY, so {order.Sonar} " +
+                            "is impossible for this unit and always will be. towedArray in the picture " +
+                            "is null for exactly this reason - read it before ordering an array, and " +
+                            "do not order one for this unit again.");
                         return false;
                     }
 
@@ -1332,7 +1369,9 @@ namespace SeaPowerAICommander.Orders
             var formation = unit.Formation;
             if (formation == null)
             {
-                Plugin.Log.LogWarning($"[orders] SetFormation: {unit.getName()} is not in a formation");
+                Refuse(
+                    $"{unit.getName()} ({unit.UniqueID}) cannot be given a formation pattern: it is " +
+                    "not in a formation. inFormation in the picture says which units are.");
                 return false;
             }
 
@@ -1472,7 +1511,9 @@ namespace SeaPowerAICommander.Orders
             ObjectBase.WeaponStatus status;
             if (!TryParseWeaponStatus(order.WeaponStatus, out status))
             {
-                Plugin.Log.LogWarning($"[orders] bad weapon status '{order.WeaponStatus}'");
+                Refuse(
+                    $"SetWeaponStatus was refused: '{order.WeaponStatus}' is not a weapons posture. " +
+                    "Use Free, Tight or Hold.");
                 return false;
             }
 

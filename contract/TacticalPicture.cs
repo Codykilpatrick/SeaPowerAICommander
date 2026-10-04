@@ -323,6 +323,23 @@ namespace SeaPowerAICommander.Picture
         /// <summary>Speed currently commanded. Differs from SpeedKnots while accelerating.</summary>
         public float CommandedSpeedKnots;
 
+        /// <summary>
+        /// True when the unit's own AI state has taken the speed command off whoever set it.
+        ///
+        /// The game sets this itself (_isSpeedCommandOverridesInfo) whenever a state writes
+        /// a speed of its own and clears it on the way out, so it is the authoritative
+        /// answer to "did my speed order fail, or did something take the throttle". A
+        /// submarine in Drift, an aircraft in MovingInFormation and a boat sprinting to
+        /// evade all set it.
+        ///
+        /// It matters because claiming _hasExplicitSpeedOrder only stops
+        /// Submarine.ApplyAiTransitSpeed - it does NOT stop a state calling SetSpeedCommand
+        /// directly on entry, which Drift does. Without this flag the verify pass reported
+        /// "order did not take", the commander reissued, the next state change overrode it
+        /// again, and the loop ran all mission.
+        /// </summary>
+        public bool SpeedOverriddenByAi;
+
         /// <summary>Current weapons posture: Tight / Free / Hold.</summary>
         public string WeaponStatus;
 

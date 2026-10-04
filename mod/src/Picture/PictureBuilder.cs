@@ -270,6 +270,34 @@ namespace SeaPowerAICommander.Picture
         /// this, which is why reading it once per picture is enough to describe the
         /// default every unit is operating under.
         /// </summary>
+        /// <summary>
+        /// The speed ceiling that applies to the unit RIGHT NOW.
+        ///
+        /// ObjectBase.MaxForwardSpeedInKnots is the surfaced figure for a submarine
+        /// (Submarine.cs:135 returns _maxForwardVelocitySurfacedInKnots), and a submerged
+        /// boat is usually faster than that, not slower. Reporting the surfaced number for
+        /// a boat that is running deep understates its ceiling - a live mission showed
+        /// maxSpeedKnots 12 next to a perfectly real commanded 15, which reads as a
+        /// contradiction and silently caps how fast the commander is willing to order.
+        ///
+        /// The game picks between the two the same way wherever it needs the real limit
+        /// (Submarine.cs:1645), so do that rather than inventing a rule.
+        /// </summary>
+        private static float MaxSpeedFor(ObjectBase obj)
+        {
+            try
+            {
+                if (obj is Submarine sub && sub.IsSubmerged != null && sub.IsSubmerged.Value)
+                    return sub.MaxForwardSpeedSubmergedInKnots;
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.LogWarning($"[picture] submerged max speed unreadable: {ex.Message}");
+            }
+
+            return obj.MaxForwardSpeedInKnots;
+        }
+
         private static void ApplyDoctrine(TacticalPicture picture, Taskforce tf)
         {
             try
@@ -389,7 +417,7 @@ namespace SeaPowerAICommander.Picture
                     Longitude = geo != null ? Finite(geo.Longitude) : 0.0,
                     Altitude = geo != null ? Finite(geo._height) : 0.0,
                     HeadingDeg = Finite(obj.getHeading()),
-                    MaxSpeedKnots = Finite(obj.MaxForwardSpeedInKnots),
+                    MaxSpeedKnots = Finite(MaxSpeedFor(obj)),
                     SpeedKnots = Finite(obj.getVelocityInKnots()),
                     WeaponStatus = obj._weaponStatus.ToString(),
                     DamagePercent = DamageFraction(obj),
@@ -549,6 +577,10 @@ namespace SeaPowerAICommander.Picture
                     // took down three consecutive decisions.
                     unit.CommandedSpeedKnots = Finite(command.CommandSpeedInKnots);
                 }
+
+                // The game's own answer to "something else owns this throttle". Set by any
+                // state that writes a speed of its own, cleared on exit.
+                unit.SpeedOverriddenByAi = obj._isSpeedCommandOverridesInfo;
             }
             catch (Exception ex)
             {
