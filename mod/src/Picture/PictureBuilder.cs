@@ -1162,17 +1162,25 @@ namespace SeaPowerAICommander.Picture
                 // Our own units come through OwnUnits; the plotting table also holds them.
                 if (obj._taskforce == tf) { skipOwn++; continue; }
 
+                float? altitudeErrorM;
+                var domain = ReadDomain(veh, obj, out altitudeErrorM);
+
                 var contact = new Contact
                 {
                     Id = obj.UniqueID,
                     Class = ReadClass(veh),
-                    Domain = ReadDomain(veh, obj),
+                    Domain = domain,
                     Identified = veh.Identified != null && veh.Identified.Value,
                     Classified = veh.IsClassified,
                     Dormant = veh.IsDormant != null && veh.IsDormant.Value,
                     Relationship = DescribeRelationship(veh),
                     DetectingSensors = veh.DetectingSensors.ToString(),
-                    FirstDetectedAt = Finite(veh.InitialDetectionEpoch),
+                    AltitudeErrorM = altitudeErrorM,
+
+                    // missionSessionTime, not GameClock.Now: detection epochs are stamped
+                    // from the per-mission clock and that is the only one they can be
+                    // subtracted from. See Contact.TrackAgeSeconds.
+                    TrackAgeSeconds = Finite(GameTime.missionSessionTime - veh.InitialDetectionEpoch),
                 };
 
                 ApplyPosition(contact, veh);
@@ -1326,19 +1334,67 @@ namespace SeaPowerAICommander.Picture
         /// been classified, so this stays inside what the task force has genuinely worked
         /// out about the contact.
         /// </summary>
-        private static string ReadDomain(Vehicle veh, ObjectBase obj)
+        /// <summary>Beyond this altitude error, metres, the force does not know what layer it is in.</summary>
+        private const float AltitudeErrorLimitM = 60f;
+
+        /// <summary>Above this altitude, metres, the contact is flying.</summary>
+        private const float AirAltitudeM = 60f;
+
+        /// <summary>Below this altitude, metres, the contact is under the water rather than on it.</summary>
+        private const float SubmergedAltitudeM = -15f;
+
+        /// <summary>
+        /// Which layer of the world a contact is in, from what the force has MEASURED.
+        ///
+        /// This used to be gated on veh.IsClassified, which was simply the wrong question.
+        /// IsClassified means "we know whose task force it is" (UnitTaskforce != null) -
+        /// allegiance, not type - and in ASW it is almost never true, so every contact
+        /// reported Unknown however much the force actually knew about it. A delegated
+        /// submarine spent an entire mission stalking a merchant that was sitting at 0.1m
+        /// below the surface, because nothing would tell it the difference between that and
+        /// a Victor III at 150m.
+        ///
+        /// The altitude estimate is the honest answer and it does NOT breach the
+        /// detection limit: TrackAltitude carries a PointEstimate with its own Error term,
+        /// synthesised from the force's own sensors (AltitudeSynthesizer), exactly like the
+        /// positional estimate and its error ellipse. Where the error is too wide to
+        /// separate the cases, this says Unknown rather than guessing - which is the point
+        /// of reading the error at all.
+        ///
+        /// obj is used only for the Land case, which has no altitude signature to read.
+        /// </summary>
+        private static string ReadDomain(Vehicle veh, ObjectBase obj, out float? errorM)
         {
+            errorM = null;
+
             try
             {
-                // Classification is precisely the point at which a task force establishes
-                // what KIND of thing a contact is, so reading the domain is fair here and
-                // withheld before it.
-                if (!veh.IsClassified) return "Unknown";
-
-                if (obj.IsAirUnit) return "Air";
-                if (obj is Submarine) return "Subsurface";
-                if (obj.IsSurfaceUnit || obj is Vessel) return "Surface";
                 if (obj is LandUnit) return "Land";
+
+                // Identified means the force knows what the unit IS, so reading its type is
+                // fair here - the same gate ApplyThreatEnvelope uses before reading reach.
+                // Kept ahead of the altitude path so an identified contact never loses its
+                // domain just because the altitude solution happens to be loose.
+                if (veh.Identified != null && veh.Identified.Value)
+                {
+                    if (obj.IsAirUnit) return "Air";
+                    if (obj is Submarine) return "Subsurface";
+                    if (obj.IsSurfaceUnit || obj is Vessel) return "Surface";
+                }
+
+                var alt = veh.Altitude;
+                if (!alt.HasValue) return "Unknown";
+
+                var estimate = alt.Value.Value;
+                errorM = Finite(estimate.Error);
+
+                // Too uncertain to call. Saying Unknown here is informative: paired with a
+                // reported error the commander can see WHY it does not know.
+                if (estimate.Error > AltitudeErrorLimitM) return "Unknown";
+
+                if (estimate.Estimate > AirAltitudeM) return "Air";
+                if (estimate.Estimate < SubmergedAltitudeM) return "Subsurface";
+                return "Surface";
             }
             catch (Exception)
             {

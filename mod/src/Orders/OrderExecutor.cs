@@ -346,12 +346,63 @@ namespace SeaPowerAICommander.Orders
             }
 
             // Clamp rather than reject - a brain asking for flank is not an error.
-            var max = unit.MaxForwardSpeedInKnots;
+            //
+            // MaxForwardSpeedInKnots is the SURFACED figure for a submarine, and a
+            // submerged boat is usually faster, so clamping a dived boat against it would
+            // quietly cap a legitimate order - a Victor III ordered to 25kt would come out
+            // at 12. Pick the ceiling the same way the game does (Submarine.cs:1645).
+            var max = MaxSpeedFor(unit);
             var knots = (max > 0f && order.SpeedKnots > max) ? max : order.SpeedKnots;
 
             unit.SetSpeedCommand(new ConstantSpeed(knots, unit));
             ClaimExplicitSpeed(unit);
             return true;
+        }
+
+        /// <summary>The speed ceiling that applies to this unit now, surfaced or submerged.</summary>
+        private static float MaxSpeedFor(ObjectBase unit)
+        {
+            var sub = unit as Submarine;
+            if (sub != null && sub.IsSubmerged != null && sub.IsSubmerged.Value)
+                return sub.MaxForwardSpeedSubmergedInKnots;
+
+            return unit.MaxForwardSpeedInKnots;
+        }
+
+        /// <summary>
+        /// Re-assert every standing speed claim, because our own MoveTo destroys them.
+        ///
+        /// GoToWaypointTask.cs:309 assigns _hasExplicitSpeedOrder = _setSpeed.value when
+        /// the task runs, and the waypoint task our MoveTo creates carries no speed - so it
+        /// sets the flag to FALSE, releasing Submarine.ApplyAiTransitSpeed to re-pick the
+        /// telegraph. A boat ordered to 5kt and then given a waypoint ends up sprinting at
+        /// 15, and the verify pass calls it "order did not take" when in truth the order
+        /// took and the next one undid it.
+        ///
+        /// Ordering within a decision cannot fix this: a standing SetSpeed from an earlier
+        /// cycle is wiped just as effectively by a fresh MoveTo. Nor is it only our doing -
+        /// the game starts waypoint tasks of its own. So the claim is re-asserted every
+        /// tick for as long as the order stands, which is also the only reading of "this
+        /// speed was chosen, not left to the boat" that stays true over time.
+        /// </summary>
+        internal static void ReassertSpeedClaims(Taskforce tf, IEnumerable<ForceOrder> standing)
+        {
+            if (tf == null || standing == null) return;
+
+            Dictionary<int, ObjectBase> byId = null;
+
+            foreach (var order in standing)
+            {
+                if (order == null || order.Kind != ForceOrderKind.SetSpeed) continue;
+
+                if (byId == null) byId = IndexOwnUnits(tf);
+
+                ObjectBase unit;
+                if (!byId.TryGetValue(order.UnitId, out unit) || unit == null || unit.IsDestroyed)
+                    continue;
+
+                ClaimExplicitSpeed(unit);
+            }
         }
 
         /// <summary>

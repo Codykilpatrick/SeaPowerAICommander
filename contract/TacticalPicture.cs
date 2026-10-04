@@ -729,8 +729,35 @@ namespace SeaPowerAICommander.Picture
         /// <summary>Which sensor types currently hold this contact (SensorTypeSet).</summary>
         public string DetectingSensors;
 
-        /// <summary>Game clock at first detection - lets a brain reason about track age.</summary>
-        public float FirstDetectedAt;
+        /// <summary>
+        /// How long this track has been held, in seconds. NOT a timestamp.
+        ///
+        /// This used to be FirstDetectedAt, the raw detection epoch, described to the
+        /// commander as telling it "how old a track is". It read the number as an age and
+        /// was wrong by the entire length of the mission: a track first detected at mission
+        /// second 3.8 was still being called "freshly detected, under 10s old" at mission
+        /// second 6488, nearly two hours later. That inverts the judgement it is for - a
+        /// brand-new contact justifies closing to classify, while a two-hour-old track that
+        /// has never firmed up is telling you it is not a submarine trying to hide.
+        ///
+        /// Computed against GameTime.missionSessionTime, NOT TacticalPicture.TimeSeconds.
+        /// Detection epochs are stamped from missionSessionTime (PlottingTable.cs:265),
+        /// which resets per mission, while TimeSeconds is the monotonic clock that does
+        /// not - so subtracting one from the other is correct only on the first mission of
+        /// a process and absurd on every one after it.
+        /// </summary>
+        public float TrackAgeSeconds;
+
+        /// <summary>
+        /// Uncertainty in the altitude estimate, in metres, or null if the force has no
+        /// altitude solution at all.
+        ///
+        /// Altitude is what separates a merchant sitting at the surface from a submarine
+        /// at depth, so it decides Domain - but only when it is worth anything. A wide
+        /// error means the force genuinely does not know which it is, and Domain says
+        /// Unknown rather than guessing.
+        /// </summary>
+        public float? AltitudeErrorM;
 
         /// <summary>Estimated speed in knots, from the track's velocity. Null if unknown.</summary>
         public float? SpeedKnots;

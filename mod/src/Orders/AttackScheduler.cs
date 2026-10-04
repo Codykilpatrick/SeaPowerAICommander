@@ -147,6 +147,25 @@ namespace SeaPowerAICommander.Orders
         }
 
         /// <summary>
+        /// Whether this unit is holding ANY staggered shot, whatever the target.
+        ///
+        /// Disengage needs the same question as the attack verify but without a target: a
+        /// boat with a held release carries no engage task, so an empty engage list alone
+        /// would read as "the disengage worked" while a salvo was still queued below.
+        /// </summary>
+        public static bool HasPendingFor(int unitId)
+        {
+            for (int i = 0; i < Queue.Count; i++)
+            {
+                var p = Queue[i];
+                if (p.Unit == null) continue;
+                if (p.Unit.UniqueID == unitId) return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
         /// Releases any shot whose moment has come. Cheap; called every tick.
         /// </summary>
         public static void Pump()

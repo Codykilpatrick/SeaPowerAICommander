@@ -148,7 +148,8 @@ there is **no single fix** — each wants a different answer:
 |---|---|---|
 | `CheckForPlayerAbort` | any `IsPlayerObject` unit reverts weapons Free→Tight on reaching a waypoint | **suppress** — `PlayerAbortGuard`, scoped to delegated forces only |
 | `Submarine.ApplyAiTransitSpeed` | boat re-picks its own speed every tick | **claim the flag** — set `_hasExplicitSpeedOrder`, as the game's waypoint task does. This is only HALF the story: see the speed row below |
-| AI states writing speed directly (`Drift`, formation states, evasion) | commanded speed is not what was ordered, and `_hasExplicitSpeedOrder` did not stop it | **accept and report** — the flag only gates `ApplyAiTransitSpeed`; `SubmarineStates/Drift.cs:67,121-144` calls `setTelegraph` and `SetSpeedCommand` directly on entry. The game sets `_isSpeedCommandOverridesInfo` when a state takes the throttle and clears it on exit, so read that and say the throttle was taken rather than that the order failed |
+| AI states writing speed directly (`Drift`, formation states, evasion) | commanded speed is not what was ordered, and `_hasExplicitSpeedOrder` did not stop it | **accept and report** — the flag only gates `ApplyAiTransitSpeed`; `SubmarineStates/Drift.cs:67,121-144` calls `setTelegraph` and `SetSpeedCommand` directly on entry. The game sets `_isSpeedCommandOverridesInfo` when a state takes the throttle and clears it on exit, so read that and say the throttle was taken rather than that the order failed. **`speedOverriddenByAi` covers only those states** — `Sprint` and anything else going through `ApplyAiTransitSpeed` leaves it false, so it is not a general answer to "did my speed order fail" |
+| **Our own `MoveTo` releasing the speed claim** | ordered 5kt, boat sprints at 15kt, `speedOverriddenByAi` false, verify says "order did not take" | **re-claim every tick** — `GoToWaypointTask.cs:309` assigns `_hasExplicitSpeedOrder = _setSpeed.value`, and the waypoint task `MoveTo` creates carries no speed, so it sets the flag to FALSE and frees `ApplyAiTransitSpeed` again. Ordering within a decision cannot fix it: a standing `SetSpeed` from an earlier cycle is wiped just as well by a fresh `MoveTo`, and the game starts waypoint tasks of its own. `OrderExecutor.ReassertSpeedClaims` runs from the tick for as long as the order stands |
 | Aircraft AI states (`MPA`/`CAP`/`Intercept`/`AEW`) | waypoints wiped; routes rebuilt from `SetRelativeToStationWaypointTask` | **refuse** — `MoveTo` is rejected for air units |
 | `Vessel` `PerformingAirOps` | launching carrier ignores speed AND course | **report it** — the game is right; say so and don't fight it |
 | `Winchester` | non-player aircraft drops to Hold | **nothing** — it is out of ordnance, which the reach fields already show as 0. As of 0.8.4 this is doctrine, not a constant: `PlanesWinchester` / `HelicoptersWinchester`, defaulting to `!isPlayer` |
@@ -333,6 +334,38 @@ Two specific traps inside it:
 
 Word the message so it cannot be read as an instruction to retry. "This is what a completed
 attack looks like, NOT a failed one" is the point of the sentence.
+
+## A contact field is only worth what the prompt says it is for
+
+Three separate bugs in one mission, all the same shape: the picture carried the answer and
+nothing told the commander what it meant.
+
+- **`firstDetectedAt` was an absolute epoch described as an age.** The prompt said it "tells
+  you how old a track is"; the field was the detection timestamp. The commander read it as
+  an age and called a track first detected at mission second 3.8 "freshly detected, under
+  10s old" at mission second 6488. It is now `trackAgeSeconds`, an actual age, because the
+  name was doing half the lying.
+- **`domain` was gated on `IsClassified`, which means "we know WHOSE it is"**
+  (`UnitTaskforce != null`), not "we know what it is". Almost never true in ASW, so every
+  contact read `Unknown`. It now comes from the altitude estimate.
+- **`altitude` sat in every contact, unexplained and unused** — a merchant at 0.1m below the
+  surface looked exactly like a Victor III at 150m to a commander never told the field
+  existed for that purpose.
+
+Together they cost a whole mission: a delegated submarine stalked a merchant for two hours
+while the Soviet boat that had it identified sat 2nm away, unheld and unreported.
+
+**Altitude is safe to read and rule 1 is intact.** `DetectedPosition.Estimate` is built by
+`EstimatePosition(bearing, range)` with an error ellipse, and `TrackAltitude` carries a
+`PointEstimate { Estimate, Error }` synthesised from the force's own sensors. It is an
+estimate, not ground truth — which is also why `ReadDomain` returns `Unknown` when the error
+is too wide rather than guessing, and reports the error so the commander can see why.
+
+**Detection epochs are on `missionSessionTime`, not `missionElapsedTime`.**
+`PlottingTable.cs:265` stamps `InitialEpoch = Epoch.AtLive(GameTime.missionSessionTime)`,
+which resets per mission, while `TacticalPicture.TimeSeconds` is the monotonic clock that
+does not. Subtracting one from the other is right on the first mission of a process and
+nonsense on every one after it. The two clocks look interchangeable and are not.
 
 ## Reach is not capability — `canMountAirstrike`
 

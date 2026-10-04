@@ -191,6 +191,11 @@ namespace SeaPowerAICommander
             // not just on decision ticks - the schedule is in game seconds, not decisions.
             AttackScheduler.Pump();
 
+            // Every tick for the same reason: a waypoint task can start at any moment and
+            // release the boat's speed back to its own AI, so a claim made once at order
+            // time does not stay made.
+            OrderExecutor.ReassertSpeedClaims(tf, state.StandingOrders.Values);
+
             // Apply anything the brain finished since the last tick. Do this before
             // submitting, so a slow brain still gets its orders in promptly.
             ForceOrderSet ready;
@@ -1177,6 +1182,34 @@ namespace SeaPowerAICommander
                             "released are very likely still in flight, and this contact's damage or " +
                             "disappearance is the only thing that reports effect. Do not read this " +
                             "as a miss and do not reissue to compensate for one.");
+                        break;
+
+                    case ForceOrderKind.Disengage:
+                        // Disengage was not verified at all, and the commander paid for it.
+                        // A submarine told to break off showed no engage task and no order
+                        // text - the order HAD worked - but sat in the BuildContactSolution
+                        // AI state, which the commander read as "still attacking" and
+                        // reissued, twice, on the same boat.
+                        //
+                        // The engage tasks are the authority here, not the state name: a
+                        // boat can hold a passive solution on something it has no intention
+                        // of shooting. So an empty engage list means the order landed, and
+                        // the right thing is to retire it rather than leave it standing to
+                        // be re-examined forever.
+                        if ((unit.EngagingContactIds == null || unit.EngagingContactIds.Count == 0)
+                            && !AttackScheduler.HasPendingFor(order.UnitId))
+                        {
+                            retire.Add(order.UnitId + ":" + order.Kind);
+                            break;
+                        }
+
+                        ignored++;
+                        Problem(picture,
+                            $"[verify] {unit.Name} ({unit.Id}): ordered to disengage but is STILL " +
+                            $"engaging contact(s) {string.Join(", ", (unit.EngagingContactIds ?? new List<int>()).ConvertAll(i => i.ToString()).ToArray())}. " +
+                            "Its weapons posture may be putting it straight back onto the target - " +
+                            "consider SetWeaponStatus Tight or Hold as well, because breaking one " +
+                            "attack does not stop the next.");
                         break;
 
                 }

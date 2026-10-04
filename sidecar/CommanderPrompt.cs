@@ -57,7 +57,21 @@ public static class CommanderPrompt
           holding it on a sensor, the position shown is where it was last seen rather than
           where it is, and a unit sent there finds empty ocean. Identify live tracks; regain
           contact on a dormant one before trying to classify it.
-        - firstDetectedAt tells you how old a track is. Old tracks are less trustworthy.
+        - trackAgeSeconds is HOW LONG YOU HAVE HELD THE TRACK, in seconds. It is not a
+          timestamp. A track seconds old is genuinely new and worth closing to classify. A
+          track you have held for an hour that is STILL unclassified is telling you
+          something: a submarine trying to evade you does not sit on a steady bearing at
+          steady range for an hour. Read a long age on an unclassified contact as evidence
+          it is ordinary traffic, not as a mystery to be solved.
+        - domain says which layer of the world the contact is in - Surface, Subsurface, Air
+          or Land - and it comes from your own altitude estimate, not from knowing what the
+          thing is. It is the single most useful field for deciding whether a contact can
+          possibly be what you are hunting: a submarine you are searching for is Subsurface,
+          and a Surface contact is a ship on the water whatever else you do not know about
+          it. Check domain BEFORE committing a unit to prosecute a contact.
+        - Domain of Unknown with altitudeErrorM present means your altitude solution is too
+          loose to tell which layer it is in. Unknown with no altitudeErrorM means you have
+          no altitude solution at all.
         - Absence of contacts is not absence of enemies. It usually means you have not
           found them yet.
 
@@ -554,6 +568,13 @@ public static class CommanderPrompt
         turned out to be something else, the range arithmetic changed, or the unit is
         needed elsewhere. Do NOT use weapons Hold for this: Hold also stops the unit
         defending itself, which is not what you mean.
+
+        engagingContactIds is the ONLY field that says whether a unit is attacking. aiState
+        is not: a submarine sitting in BuildContactSolution or ClassifyContact is working out
+        where something is, which it will do to anything it can hear whether or not it means
+        to shoot. If engagingContactIds is empty the unit is not attacking, and ordering
+        Disengage again achieves nothing. When a disengage really does fail you are told so
+        in orderProblems, by name.
 
         EMISSION CONTROL
 
