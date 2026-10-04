@@ -158,8 +158,36 @@ public static class OrderSchema
                     ["description"] = "Orders to issue this cycle. Return an empty array when the current posture is already correct - doing nothing is a valid and often correct decision.",
                     ["items"] = order,
                 },
+                // Last, so it is written after the orders and describes the plan they
+                // serve rather than one the orders then drift away from.
+                ["plan"] = new JsonObject
+                {
+                    ["type"] = "object",
+                    ["description"] = "Your note to yourself for the next decision - the only thing you will remember of this one. Rewrite it in full every cycle; anything you leave out is forgotten.",
+                    ["properties"] = new JsonObject
+                    {
+                        ["intent"] = new JsonObject
+                        {
+                            ["type"] = "string",
+                            ["description"] = "The course of action over the next several cycles and why, in two or three sentences. Not a list of this cycle's orders. Keep it unless the picture gives you a reason to change it, and when you change it, say what changed.",
+                        },
+                        ["watchFor"] = new JsonObject
+                        {
+                            ["type"] = "string",
+                            ["description"] = "What would make you change the plan, as concretely as the picture allows - a contact id closing inside a range, a unit reaching a position, a classification firming up.",
+                        },
+                        ["lessons"] = new JsonObject
+                        {
+                            ["type"] = "array",
+                            ["description"] = "Durable facts the GAME told you that the picture will not repeat, one line each naming the unit: above all refusals that say they are permanent, and tactical-AI behaviour you decided to accept rather than fight. Never a guess about what a contact is - that belongs in watchFor. Carry each forward until it stops being true. At most 8.",
+                            ["items"] = new JsonObject { ["type"] = "string" },
+                        },
+                    },
+                    ["required"] = new JsonArray("intent", "watchFor", "lessons"),
+                    ["additionalProperties"] = false,
+                },
             },
-            ["required"] = new JsonArray("assessment", "orders"),
+            ["required"] = new JsonArray("assessment", "orders", "plan"),
             ["additionalProperties"] = false,
         };
     }

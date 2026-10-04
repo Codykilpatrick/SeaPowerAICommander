@@ -110,12 +110,14 @@ public sealed class OpenRouterClient : IDisposable
         // this costs an extra call on the first cycle only.
         picture.Objective = await ObjectiveDeriver.ResolveAsync(picture, AskAsync, ct).ConfigureAwait(false);
 
+        var plan = CommanderPlan.Recall(picture);
+
         var body = new JsonObject
         {
             ["model"] = _model,
             ["messages"] = new JsonArray(
                 CachedSystemMessage(CommanderPrompt.System),
-                new JsonObject { ["role"] = "user", ["content"] = CommanderPrompt.BuildUserMessage(picture) }),
+                new JsonObject { ["role"] = "user", ["content"] = CommanderPrompt.BuildUserMessage(picture, plan) }),
             // Usage accounting is opt-in on OpenRouter. Without it we cannot tell a slow
             // decision caused by a large picture from one caused by long reasoning.
             ["usage"] = new JsonObject { ["include"] = true },
@@ -215,7 +217,17 @@ public sealed class OpenRouterClient : IDisposable
         if (!string.IsNullOrWhiteSpace(assessment))
             log.AppendLine($"     assessment: {assessment}");
 
-        if (parsed["orders"] is not JsonArray array) return set;
+        // Remembered as soon as the response parses, before the orders are even read. If
+        // the mod has already given up on this decision the orders are lost but the plan
+        // is not - which is fine, because the plan is intent, and standingOrders rather
+        // than the plan is what tells the commander what was actually ordered.
+        CommanderPlan.AppendLog(log, CommanderPlan.Remember(picture, parsed["plan"]));
+
+        if (parsed["orders"] is not JsonArray array)
+        {
+            CommanderPlan.RecordOrders(picture, set.Orders);
+            return set;
+        }
 
         foreach (var node in array)
         {
@@ -267,6 +279,7 @@ public sealed class OpenRouterClient : IDisposable
             });
         }
 
+        CommanderPlan.RecordOrders(picture, set.Orders);
         return set;
     }
 

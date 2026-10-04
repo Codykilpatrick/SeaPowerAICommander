@@ -232,6 +232,41 @@ public static class CommanderPrompt
         homeBaseName says where a unit would go. An air unit without it has nowhere to return
         to and the order is refused.
 
+        YOUR PLAN
+
+        You remember nothing between decisions except what you write in plan. You are shown
+        last cycle's plan before the picture, and you write it again in full every cycle -
+        whatever you leave out is gone.
+
+        - intent is the course of action, held across several cycles. A plan rewritten from
+          scratch each cycle is not a plan: it is how one transit came to receive seven
+          different speed orders and eleven waypoints a few hundred metres apart. Keep the
+          intent until the picture gives you a reason to change it, and when you change it,
+          say what changed.
+        - watchFor is what would make you change it. Concrete beats general: "contact 6
+          inside 2nm", not "if the threat increases".
+        - lessons is for what the picture will NOT tell you twice. A refusal appears in
+          orderProblems for one cycle only - if it says the order is impossible for that
+          unit, put it in lessons or you will order it again. Likewise tactical-AI behaviour
+          you looked at and decided to accept rather than fight, so you do not re-litigate
+          it next cycle. Drop a lesson once it stops being true.
+        - A lesson is something the GAME told you - a refusal, an orderProblems line, a
+          reach or loadout figure, a classification - never your own reading of a contact.
+          "Contacts 239 and 259 are probably land emitters" is a guess; written as a lesson
+          it survived a cycle in which they were a Kidd and a Spruance closing on the boats
+          that held the lesson. Guesses about what a contact is or will do go in watchFor,
+          phrased as the thing that would settle them.
+
+        If an order from your last decision is listed as NOT STANDING, it never reached the
+        units or has since ended. Do not describe it as under way - one commander reported
+        its boats "continue closing" for a whole cycle on waypoints that had been dropped.
+
+        The picture always wins. The plan was written on less information than you have now;
+        where they disagree - a unit you planned around is lost, a contact you were stalking
+        has turned out to be a merchant - the picture is right and the plan changes. Never
+        issue an order only because the plan says so, and never read the plan as a record of
+        what was ordered: standingOrders is that record.
+
         ORDERS THAT DID NOT TAKE
 
         orderProblems lists standing orders your units are demonstrably not carrying out.
@@ -782,7 +817,7 @@ public static class CommanderPrompt
         - Give each order a one-sentence reason.
         """;
 
-    public static string BuildUserMessage(TacticalPicture picture)
+    public static string BuildUserMessage(TacticalPicture picture, CommanderPlan.Entry? plan)
     {
         var json = JsonSerializer.Serialize(picture, PictureJson.Options);
 
@@ -794,6 +829,11 @@ public static class CommanderPrompt
             sb.AppendLine($"YOUR OBJECTIVE: {picture.Objective}");
             sb.AppendLine();
         }
+
+        // After the objective, because the plan is the commander's way of pursuing it and
+        // should be read in that light; before the picture, because the picture is what
+        // the plan gets checked against.
+        CommanderPlan.AppendTo(sb, plan, picture);
 
         sb.AppendLine($"Tactical picture at mission time {picture.TimeSeconds:F0}s.");
         sb.AppendLine($"You command \"{picture.TaskforceName}\" (side: {picture.Side}). Alert state: {(picture.IsOnAlert ? "ALERT" : "normal")}.");

@@ -428,6 +428,30 @@ being much harder to reason about.
 It is read fresh every tick, so it can be flipped at runtime — that is what the right-click
 menu does.
 
+## The commander's plan lives in the sidecar
+
+Each decision is a fresh call, so the only memory the commander has of its own reasoning is
+the `plan` it writes into every response (`intent`, `watchFor`, `lessons`), which
+`CommanderPlan` stores and puts back in front of the next decision, between the objective
+and the picture. It exists because the picture's continuity fields say what *happened*
+but not what the commander was *trying* to do, and because `orderProblems` carries a
+refusal for exactly one cycle — a "never order this again" was forgotten two cycles later.
+
+- Keyed by mission, side **and task force**, and dropped whenever
+  `SecondsSinceLastDecision < 0`, which is how a restart of the same mission is told apart
+  from a continuation.
+- **Restarting the sidecar forgets every plan.** Harmless — the next decision writes a new
+  one — but it means a prompt-change restart mid-mission costs one cycle of continuity.
+- **A plan makes a dropped order look like a live one.** In the first live run the plan said
+  "close on 227", the mod dropped the MoveTos as stale, and the commander reported its boats
+  closing anyway. The sidecar now remembers each decision's orders and lists any that are
+  absent from `standingOrders` next cycle as NOT STANDING.
+- **Lessons attract guesses.** The same run stored "239 and 259 are probably land
+  emitters" - a Kidd and a Spruance - as a lesson. The prompt now limits lessons to what the
+  game said and sends guesses to `watchFor`.
+- It is not in the saved pictures. The sidecar log prints it as `plan:` / `watch:` /
+  `learned:` lines under each assessment; read those to see what the commander carried.
+
 ## Cost is a design constraint
 
 One OpenRouter call per AI task force per decision. Delegating the player's fleet doubles
