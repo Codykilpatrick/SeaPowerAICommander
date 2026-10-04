@@ -40,7 +40,7 @@ namespace SeaPowerAICommander.Picture
         {
             var picture = new TacticalPicture
             {
-                TimeSeconds = GameTime.time,
+                TimeSeconds = GameClock.Now,
                 TaskforceName = string.IsNullOrEmpty(tf._nameInMissionFile) ? "(unnamed)" : tf._nameInMissionFile,
                 Side = tf.Side.ToString(),
                 IsOnAlert = tf._isOnAlert,

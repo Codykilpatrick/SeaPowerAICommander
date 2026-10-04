@@ -80,7 +80,7 @@ namespace SeaPowerAICommander.Orders
 
             if (plan.Count == 0) return accepted;
 
-            var now = GameTime.time;
+            var now = GameClock.Now;
             var longestHold = 0f;
             foreach (var p in plan)
             {
@@ -153,7 +153,7 @@ namespace SeaPowerAICommander.Orders
         {
             if (Queue.Count == 0) return;
 
-            var now = GameTime.time;
+            var now = GameClock.Now;
 
             for (int i = Queue.Count - 1; i >= 0; i--)
             {

@@ -197,7 +197,7 @@ namespace SeaPowerAICommander
             if (state.Brain.TryTakeOrders(out ready))
                 Consume(tf, state, ready);
 
-            var now = GameTime.time;
+            var now = GameClock.Now;
             if (now < state.NextSubmitTime) return;
 
             // Ask before building. A picture walks every unit and every plotting-table
@@ -250,7 +250,7 @@ namespace SeaPowerAICommander
         /// </summary>
         private static void Consume(Taskforce tf, BrainState state, ForceOrderSet ready)
         {
-            var age = GameTime.time - ready.DerivedFromTime;
+            var age = GameClock.Now - ready.DerivedFromTime;
 
             // Filter per order, not per decision. A decision typically mixes perishable
             // waypoints with durable posture; discarding the whole set to protect against
@@ -307,7 +307,7 @@ namespace SeaPowerAICommander
             {
                 var key = order.UnitId + ":" + order.Kind;
                 state.StandingOrders[key] = order;
-                state.OrderIssuedAt[key] = GameTime.time;
+                state.OrderIssuedAt[key] = GameClock.Now;
             }
         }
 
@@ -573,7 +573,7 @@ namespace SeaPowerAICommander
         /// </summary>
         private static void TallyAirstrikes(TacticalPicture picture, BrainState state)
         {
-            var now = GameTime.time;
+            var now = GameClock.Now;
 
             foreach (var strike in picture.Airstrikes)
             {
@@ -914,7 +914,7 @@ namespace SeaPowerAICommander
             if (!state.OrderIssuedAt.TryGetValue(order.UnitId + ":" + order.Kind, out issued))
                 return false;
 
-            return GameTime.time - issued < grace;
+            return GameClock.Now - issued < grace;
         }
 
         private static void VerifyStandingOrders(BrainState state, TacticalPicture picture)

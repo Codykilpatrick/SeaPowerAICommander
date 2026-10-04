@@ -22,6 +22,29 @@ The repo is `Codykilpatrick/SeaPowerAICommander` (public). Cody owns it.
 > The local folder is still named `SeaPowerForceAI`. That is just the directory — nothing
 > in git depends on it.
 
+## Which game build this is written against
+
+**Sea Power 0.8.4 Build 261002** (Steam buildid 25677385, 2 Oct 2026). Most of what follows
+was learned against 0.8.2 Build #358 and re-checked against 0.8.4 on 4 Oct 2026; where a
+claim has not been re-observed *in game* since, it says so.
+
+A decompile lives at `C:\Users\codyk\Documents\seapower-decomp`, and it is **a git repo
+whose history is one commit per game build**. That is the whole point of it: after an
+update, re-decompile over the top and `git diff` says exactly what moved. Decompile with
+
+```bash
+ilspycmd -p -o . "<SeaPowerDir>/Sea Power_Data/Managed/Seapower-Scripts.dll"
+```
+
+after clearing everything but `.git`, so deletions show up as deletions. The 0.8.2→0.8.4
+diff is 956 files, +104k/−26k, with 195 new types.
+
+The game's own mod-compat check is `Seapower/ModCompatibility.cs`, reading the same
+`[Compatibility]` keys as our `_info.ini`. `ApproximateVersion` resolves to
+`SemanticVersion.ApproximatelyEquals`: MAJOR and MINOR equal, PATCH greater-or-equal. Ours
+says `0.8.0`, so it passes anything in 0.8.x and will **refuse the day the game reaches
+0.9**.
+
 ## Build
 
 ```bash
@@ -120,8 +143,9 @@ there is **no single fix** — each wants a different answer:
 | `Submarine.ApplyAiTransitSpeed` | boat re-picks its own speed every tick | **claim the flag** — set `_hasExplicitSpeedOrder`, as the game's waypoint task does |
 | Aircraft AI states (`MPA`/`CAP`/`Intercept`/`AEW`) | waypoints wiped; routes rebuilt from `SetRelativeToStationWaypointTask` | **refuse** — `MoveTo` is rejected for air units |
 | `Vessel` `PerformingAirOps` | launching carrier ignores speed AND course | **report it** — the game is right; say so and don't fight it |
-| `Winchester` | non-player aircraft drops to Hold | **nothing** — it is out of ordnance, which the reach fields already show as 0 |
-| `AI.CheckForRaiseAlert` | an AI-side unit reverts EMCON Silent **and** weapons Tight, together, the moment it holds a threat — and so does everything within 10nm and every ship in its formation | **report it** — `OnAlert` in the picture; the game is right that a warship holding a threat should look and shoot, and concealment is a pre-contact option only |
+| `Winchester` | non-player aircraft drops to Hold | **nothing** — it is out of ordnance, which the reach fields already show as 0. As of 0.8.4 this is doctrine, not a constant: `PlanesWinchester` / `HelicoptersWinchester`, defaulting to `!isPlayer` |
+| `AI.CheckForRaiseAlert` | an AI-side unit reverts EMCON Silent **and** weapons Tight, together, the moment it holds a threat — and so does everything within 10nm and every ship in its formation | **report it** — `OnAlert` in the picture; the game is right that a warship holding a threat should look and shoot, and concealment is a pre-contact option only. 0.8.4 makes it conditional: see Force EMCON below |
+| `AI._excludeFromAIRadarRoutine` (Force EMCON, 0.8.4) | unit stays silent even holding a threat — and when an *observed, identified, directly inbound* weapon finally does appear, it goes active AND slams `_weaponStatus = Free`, discarding the ordered posture | **report it** — read off `ObjectBase._ai`; it is a mission-authored property (`ExcludeFromAIRadarRoutine`, also a trigger action), so `SetEmcon Radiate` on such a unit cannot stick and the commander needs to know before it spends an order |
 | Submarine AI states (`Drift`/`Sprint`/`ClassifyContact`/…) | boat re-picks its depth band | **accept and report** — each state calls `setPresetDepth` on *entry*, not per tick, so an ordered band holds until the next state change; the verify pass says when it went |
 
 Two traps worth naming:
@@ -136,6 +160,51 @@ Two traps worth naming:
 Do not diagnose these from the decompile alone. Several confident readings were wrong —
 Winchester for player aircraft, formation speed caps, the ammunition gate on launches.
 **Read a saved picture instead** (see Testing): it shows exactly what the model got.
+
+## 0.8.4 put a doctrine layer above every order we issue
+
+**`Taskforce.TacticalDoctrine` is a force-level control surface the game now owns.** This
+is the single most consequential thing in the 0.8.3/0.8.4 update for this project, and it
+cuts both ways.
+
+The old Doctrine Panel became Standing Orders, and the model behind it is `TacticalDoctrine`
+— constructed for a `Taskforce` (the root, `isRoot: true`), for a `UnitFormation`, and
+lazily per `ObjectBase`. Each setting resolves up the chain through `ParentDoctrine`, and
+you read the effective answer off `.ResolvedValue`. Defaults are chosen by
+`ReadRootPlayerDoctrineValue(isRoot, isPlayer, …)`, so **an AI force and the player's force
+start from different doctrine**, which is exactly the seam a delegated player force falls
+into.
+
+Settings that gate orders we already issue:
+
+| Doctrine setting | What it decides |
+|---|---|
+| `AutoAttackSurface` | whether a unit engages surface contacts at all. Default `!isPlayer` — so a **delegated player force defaults to not auto-attacking**. Note the gate at `AI.cs:4915` no longer tests `IsPlayerObject`; it is doctrine for everyone now |
+| `ShipsAutoUseAntiShipMissilesAgainstSurfaceTargets` | whether Weapons Free is enough to release ASMs |
+| `ShipsAutoUseSAMsAgainstSurfaceTargets` | SAMs against surface targets |
+| `ShipsOnWeaponsTightEngageHostileAircraft` | flipped to **off** by default in 0.8.3 — Tight now means more Tight than it did |
+| `RemoveEngageTaskAfter` | how long an engage task survives; read before trusting any "that attack is over" reasoning |
+| `PlanesWinchester` / `HelicoptersWinchester` | the Winchester→RTB behaviour, now a knob |
+| `FighterRtbCondition` | default `AllAamExpended` |
+| `SubmarineTransitTelegraph` / `Vessel…` / `Aircraft…` | the AI's own speed choice — the thing `_hasExplicitSpeedOrder` exists to override |
+| `AllowAlignment` | the auto-align that `ObjectBase.cs:4237` checks |
+
+`PlayerAutoAttackSurface` is **gone** — `OptionsManager` migrates it once into
+`[Tactics] AutoAttackSurface` and deletes the old key. Anything looking for the old option
+finds nothing and reads `false`.
+
+Two consequences, and they are different:
+
+- **Risk.** The commander issues orders into a layer it cannot see. An order that doctrine
+  forbids is accepted, never carried out, and then reported by the verify pass as "did not
+  take" — which reaches the commander as an instruction to try again. That is the exact
+  failure mode the grace windows were built to prevent, arriving by a new route.
+- **Opportunity.** This is a *supported* control surface at the Force altitude the whole
+  project is premised on, and it is writable. Several rows in the table above are
+  workarounds for the absence of precisely this.
+
+Neither has been acted on yet. Decide the risk side first: the picture should carry the
+resolved doctrine before the commander is asked to reason about it.
 
 ## Orders that name a target beat orders that name a place
 
@@ -164,12 +233,28 @@ The mechanism differs per hull type and choosing wrong is a silent no-op, not an
   NOT `Loitering`, whatever `Aircraft.cs:266` says; four live attempts from it never
   diverted while every attempt from `Default` worked). A fighter already prosecuting an air contact ignores the order. That is what
   `currentOrder` in the picture is for, and what the verify pass checks.
+- **0.8.4 rewired these transitions and they have NOT been re-observed in game.** They now
+  live around `Aircraft.cs:339-370`. Three changes worth knowing before trusting the list
+  above: there is a second trigger field, `_ai._objectToClassify`, wired in parallel with
+  `_objectToIdentify` on every identify state; `IdentifySubSurfaceContact` is reachable from
+  `Default`/`MaritimePatrol`/`Loitering` but **not** from `MPA`; and a new `IdentifyAirContact`
+  state exists, reachable from `Default` only and gated on `AllowAI()`. `Loitering` is still
+  wired to `IdentifySurfaceContact` — it was wired in 0.8.2 as well and did not work, so
+  leave the refusal in place until a live run says otherwise.
 
 ## The verify pass must not mistake slow for broken
 
 `orderProblems` reaches the commander, so a false report is not a cosmetic bug — it is an
 instruction. Everything the verify pass checks takes TIME, and checking one cycle after
-ordering produced three wrong reports in the first four cycles of a live mission:
+ordering produced three wrong reports in the first four cycles of a live mission.
+
+**Every grace below was timed on 0.8.2 and none has been re-timed on 0.8.4.** Treat them
+as suspect until a live run says otherwise: the update removed `IdentificationRate` from
+every ESM sensor, rebuilt gunnery and CIWS, enlarged all aircraft RCS while lowering
+air-search radar gain, and added the OODA layer, in which a unit's combat system has a
+reaction time and a cap on how many contacts it can work at once. Detection and
+prosecution timings have all moved, and the numbers here are the ones that decide whether
+the commander is told the truth.
 
 | Order | Actually landed | Reported at N+1 |
 |---|---|---|
@@ -378,6 +463,9 @@ defaults.
 
 - Comments explain **why**, especially where the code looks wrong but isn't. Match that
   density; it is the house style and most of it is load-bearing.
+- Mission time comes from `GameClock.Now`, never from `GameTime` directly. 0.8.3 renamed
+  `GameTime.time` to `missionElapsedTime` and widened it to a double; the accessor holds
+  the cast so the next rename is one line instead of eight call sites.
 - Commit messages are prose explaining the problem and the reasoning, not a changelog.
 - Git identity is **not set globally** on this machine — commits fail with "Author identity
   unknown". Both Sea Power repos set it locally as
