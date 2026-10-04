@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using HarmonyLib;
 using SeaPower;
@@ -90,6 +91,12 @@ namespace SeaPowerAICommander
             public readonly Dictionary<int, LostUnit> KnownUnits = new Dictionary<int, LostUnit>();
 
             /// <summary>
+            /// The aircraft and helicopters behind KnownUnits, held by reference so one that
+            /// has left the force can still be asked HOW it left. See <see cref="Recovered"/>.
+            /// </summary>
+            public readonly Dictionary<int, ObjectBase> KnownAirframes = new Dictionary<int, ObjectBase>();
+
+            /// <summary>
             /// Orders currently in force, keyed by unit and kind.
             ///
             /// These ACCUMULATE. A cycle that issues no orders does not mean nothing is in
@@ -126,7 +133,32 @@ namespace SeaPowerAICommander
             public int TotalKills;
             public float LastDecisionTime = -1f;
             public bool Seeded;
+
+            /// <summary>
+            /// Why the next decision should come early, or null. Held until the brain is
+            /// free rather than dropped when it is busy: with decisions taking longer than a
+            /// tick, the brain is busy at nearly every moment an event happens, and the point
+            /// is that the decision after the one in flight starts at once instead of waiting
+            /// out a tick.
+            /// </summary>
+            public string PendingEvent;
+            public float NextEventCheck = float.MinValue;
+            public float LastSubmitTime = float.MinValue;
+            public bool EventsSeeded;
+
+            // Cumulative for the mission, so each loss, kill or hostile triggers once. A
+            // track that drops and is re-acquired is the same contact and is not news.
+            public readonly HashSet<int> EventAlive = new HashSet<int>();
+            public readonly HashSet<int> EventHostiles = new HashSet<int>();
+            public readonly HashSet<int> EventKills = new HashSet<int>();
         }
+
+        /// <summary>
+        /// How often to look for an event, in game seconds. The look walks the force and its
+        /// plotting table, which is too much for every frame and plenty at this rate - an
+        /// event noticed 5s late costs nothing next to a 60s tick.
+        /// </summary>
+        private const float EventCheckSeconds = 5f;
 
         private static void Postfix(TaskForceAI __instance)
         {
@@ -203,7 +235,17 @@ namespace SeaPowerAICommander
                 Consume(tf, state, ready);
 
             var now = GameClock.Now;
-            if (now < state.NextSubmitTime) return;
+
+            if (Plugin.MinEventGapSeconds > 0f && now >= state.NextEventCheck)
+            {
+                state.NextEventCheck = now + EventCheckSeconds;
+                var why = DetectEvent(tf, state);
+                if (why != null && state.PendingEvent == null) state.PendingEvent = why;
+            }
+
+            var early = state.PendingEvent != null
+                        && now - state.LastSubmitTime >= Plugin.MinEventGapSeconds;
+            if (now < state.NextSubmitTime && !early) return;
 
             // Ask before building. A picture walks every unit and every plotting-table
             // entry, and a decision spans many ticks under time compression - building one
@@ -211,6 +253,17 @@ namespace SeaPowerAICommander
             // this tick did not consume a decision slot, so the next one should not wait.
             if (state.Brain.IsBusy) return;
 
+            if (now < state.NextSubmitTime)
+            {
+                Plugin.Log.LogInfo(
+                    $"[brain] {tf._nameInMissionFile}: deciding early, " +
+                    $"{state.NextSubmitTime - now:F0}s before the tick - {state.PendingEvent}");
+            }
+
+            // Any decision answers whatever was pending, early or not: the picture it is
+            // about to build already shows the event.
+            state.PendingEvent = null;
+            state.LastSubmitTime = now;
             state.NextSubmitTime = now + Plugin.TickIntervalSeconds;
 
             // Everything from here runs on the Unity thread, so it is the only part of
@@ -239,7 +292,7 @@ namespace SeaPowerAICommander
             // empty fleet costs real money to be told "nothing".
             if (picture.OwnUnits.Count == 0) return;
 
-            ApplyContinuity(state, picture, now);
+            ApplyContinuity(tf, state, picture, now);
 
             state.Brain.Submit(picture);
         }
@@ -321,7 +374,7 @@ namespace SeaPowerAICommander
         /// since. Without this the brain re-derives everything each tick and cannot tell
         /// that it is losing the battle.
         /// </summary>
-        private static void ApplyContinuity(BrainState state, TacticalPicture picture, float now)
+        private static void ApplyContinuity(Taskforce tf, BrainState state, TacticalPicture picture, float now)
         {
             // Diff this cycle's roster against the last to find losses. Skipped on the
             // first decision - every unit would otherwise look newly arrived.
@@ -332,8 +385,9 @@ namespace SeaPowerAICommander
 
                 foreach (var pair in state.KnownUnits)
                 {
-                    if (!present.Contains(pair.Key))
-                        picture.RecentLosses.Add(pair.Value);
+                    if (present.Contains(pair.Key)) continue;
+                    if (Recovered(state, pair.Key)) continue;
+                    picture.RecentLosses.Add(pair.Value);
                 }
 
                 state.TotalLosses += picture.RecentLosses.Count;
@@ -419,6 +473,9 @@ namespace SeaPowerAICommander
 
             // Re-seed the roster for the next diff.
             state.KnownUnits.Clear();
+            state.KnownAirframes.Clear();
+            KeepAirframes(tf._taskforceAircraft, state);
+            KeepAirframes(tf._taskforceHelicopters, state);
             foreach (var u in picture.OwnUnits)
             {
                 state.KnownUnits[u.Id] = new LostUnit
@@ -461,6 +518,128 @@ namespace SeaPowerAICommander
         /// built, so a purely civilian side costs nothing at all rather than costing a model
         /// call to be told it has nothing to fight with.
         /// </summary>
+        /// <summary>
+        /// Something the commander should answer before the next tick, or null.
+        ///
+        /// The fixed tick made a 60s cycle the floor on reaction time, and at time compression
+        /// a decision often lands several game-minutes after the thing it should have
+        /// answered: a patrol boat turned Hostile, fired on Ticonderoga, and was not shot back
+        /// at for the best part of a cycle. These three are the events that change what the
+        /// right orders are (losses count ships, submarines and land units only - see below).
+        /// Incoming weapons are deliberately absent - the tactical AI
+        /// defends against those in seconds, and no decision arrives in time to help.
+        ///
+        /// Detection-limited like the picture: hostiles and kills come from the plotting
+        /// table only, and losses from the force's own unit lists.
+        /// </summary>
+        private static string DetectEvent(Taskforce tf, BrainState state)
+        {
+            string why = null;
+
+            try
+            {
+                // Aircraft and helicopters are left out on purpose. One that lands leaves the
+                // task force exactly as one shot down does (see Recovered), and a single
+                // airframe is rarely worth paying for a decision ahead of the tick - the next
+                // one reports it in recentLosses either way.
+                var alive = new HashSet<int>();
+                CollectAlive(tf._taskforceVessels, alive);
+                CollectAlive(tf._taskforceSubmarines, alive);
+                CollectAlive(tf._taskforceLandUnits, alive);
+
+                if (state.EventsSeeded)
+                {
+                    foreach (var id in state.EventAlive)
+                    {
+                        if (alive.Contains(id)) continue;
+                        why = $"own unit {id} lost";
+                        break;
+                    }
+                }
+                state.EventAlive.Clear();
+                state.EventAlive.UnionWith(alive);
+
+                var plot = tf.PlottingTable;
+                if (plot != null)
+                {
+                    foreach (var veh in plot.Vehicles.ToList())
+                    {
+                        var obj = veh != null ? veh.Object : null;
+                        if (obj == null || obj._taskforce == tf) continue;
+
+                        if (obj.IsDestroyed)
+                        {
+                            if (obj._taskforce != null
+                                && tf.RelationshipTo(obj._taskforce) == RelationsState.Hostile
+                                && state.EventKills.Add(obj.UniqueID)
+                                && state.EventsSeeded && why == null)
+                            {
+                                why = $"enemy {obj.getName()} ({obj.UniqueID}) destroyed";
+                            }
+                            continue;
+                        }
+
+                        if (DescribeRelationshipQuiet(veh) == RelationsState.Hostile
+                            && state.EventHostiles.Add(obj.UniqueID)
+                            && state.EventsSeeded && why == null)
+                        {
+                            why = $"contact {obj.UniqueID} now Hostile";
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // The tick still fires on schedule, so a failure here costs reaction time,
+                // never a decision.
+                Plugin.Log.LogWarning($"[brain] event check failed for {tf._nameInMissionFile}: {ex.Message}");
+            }
+
+            // The first look only learns what is already there. Every contact would otherwise
+            // be "new" at mission start, and the first tick is about to fire anyway.
+            state.EventsSeeded = true;
+            return why;
+        }
+
+        /// <summary>
+        /// Whether a unit that has left the force landed rather than died.
+        ///
+        /// Recovery despawns an aircraft: DeSpawn.cs:143 calls destroyObject, which takes it
+        /// off the task force's lists exactly as a shoot-down does, so the roster diff
+        /// reported every aircraft that came home as lost. The commander was then told it
+        /// had lost aircraft it still had, in the one field it is told to read as its own
+        /// casualties. Both recovery paths (DeSpawn.cs:142 and the deck clear at
+        /// FlightDeck.cs:3408) set _spawnTime to double.MaxValue first; a shot-down aircraft
+        /// instead gets a finite time for its pilot's ejection, so the value tells them apart.
+        /// </summary>
+        private static bool Recovered(BrainState state, int id)
+        {
+            ObjectBase obj;
+            if (!state.KnownAirframes.TryGetValue(id, out obj) || obj == null) return false;
+            return obj._spawnTime == double.MaxValue;
+        }
+
+        private static void KeepAirframes(List<ObjectBase> units, BrainState state)
+        {
+            if (units == null) return;
+            foreach (var obj in units)
+                if (obj != null && !obj.IsDestroyed) state.KnownAirframes[obj.UniqueID] = obj;
+        }
+
+        private static void CollectAlive(List<ObjectBase> units, HashSet<int> into)
+        {
+            if (units == null) return;
+            foreach (var obj in units)
+                if (obj != null && !obj.IsDestroyed) into.Add(obj.UniqueID);
+        }
+
+        // CurrentRelationship, as the picture uses, so "Hostile" means the same thing in both.
+        private static RelationsState? DescribeRelationshipQuiet(Vehicle veh)
+        {
+            try { return veh.CurrentRelationship(); }
+            catch (Exception) { return null; }
+        }
+
         private static bool HasArmedUnit(Taskforce tf)
         {
             try

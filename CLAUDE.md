@@ -461,6 +461,17 @@ that gap is the only thing stopping time compression multiplying the bill — at
 
 Before adding anything that runs per decision, count what it costs per battle.
 
+**Decisions also fire early on events** (`MinEventGapSeconds`, default 15, 0 = off): a ship,
+submarine or land unit lost, an enemy destroyed, or a contact turning Hostile. The event is
+held while a decision is in flight, so the next one starts the moment the brain is free
+rather than a tick later. Aircraft losses do not trigger one.
+
+**A landed aircraft is despawned** (`DeSpawn.cs:143` → `destroyObject` →
+`RemoveTaskForceObject`), so it leaves the force's unit lists exactly as a shot-down one
+does, and `recentLosses` used to report every recovered aircraft as lost. The tell is
+`_spawnTime == double.MaxValue`, which both recovery paths set and a shoot-down never does;
+`ForceBrainTick.Recovered` holds aircraft by reference across a cycle to read it.
+
 ## Failure must stay non-fatal
 
 If the sidecar is down or a cycle fails, the plugin logs a warning and the game's own

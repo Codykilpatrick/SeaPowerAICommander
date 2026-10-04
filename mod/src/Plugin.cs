@@ -28,6 +28,7 @@ namespace SeaPowerAICommander
 
         private static ConfigEntry<bool> _cfgEnabled;
         private static ConfigEntry<float> _cfgTickInterval;
+        private static ConfigEntry<float> _cfgMinEventGapSeconds;
         private static ConfigEntry<bool> _cfgDrivePlayerTaskforce;
         private static ConfigEntry<bool> _cfgDumpPictureJson;
         private static ConfigEntry<BrainType> _cfgBrain;
@@ -66,6 +67,9 @@ namespace SeaPowerAICommander
 
         internal static bool Enabled => _cfgEnabled != null && _cfgEnabled.Value;
         internal static float TickIntervalSeconds => _cfgTickInterval != null ? _cfgTickInterval.Value : 60f;
+
+        /// <summary>0 turns early decisions off and leaves the fixed tick alone.</summary>
+        internal static float MinEventGapSeconds => _cfgMinEventGapSeconds != null ? _cfgMinEventGapSeconds.Value : 15f;
         internal static bool DrivePlayerTaskforce => _cfgDrivePlayerTaskforce != null && _cfgDrivePlayerTaskforce.Value;
 
         /// <summary>Which brain the tick will build. Read by the delegation menu so it can
@@ -134,6 +138,16 @@ namespace SeaPowerAICommander
                     "Lower is more responsive and proportionally more expensive once a " +
                     "network-backed brain is attached.",
                     new AcceptableValueRange<float>(1f, 600f)));
+
+            _cfgMinEventGapSeconds = _config.Bind("General", "MinEventGapSeconds", 15f,
+                new ConfigDescription(
+                    "Decide early, without waiting for the tick, when something happens that the " +
+                    "commander should answer: one of its own units is lost, an enemy unit is " +
+                    "destroyed, or a contact turns Hostile. This is the least game-time between " +
+                    "the last decision and an early one, so a burst of events costs one decision " +
+                    "rather than several. 0 turns early decisions off. Each early decision is a " +
+                    "paid request on top of the tick's.",
+                    new AcceptableValueRange<float>(0f, 600f)));
 
             _cfgDrivePlayerTaskforce = _config.Bind("General", "DrivePlayerTaskforce", false,
                 "Hand your own task force to the commander, so it runs your fleet exactly as it " +
